@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-maroon-50: #fff5f5;
+  --color-maroon-100: #ffe3e3;
+  --color-maroon-200: #ffc9c9;
+  --color-maroon-300: #ffa8a8;
+  --color-maroon-400: #ff8787;
+  --color-maroon-500: #ff6b6b;
+  --color-maroon-600: #fa5252;
+  --color-maroon-700: #e03131;
+  --color-maroon-800: #c92a2a;
+  --color-maroon-900: #800000;
+}
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: #f9fafb;
+}
+
+/* Ensure the app takes up the full screen */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
