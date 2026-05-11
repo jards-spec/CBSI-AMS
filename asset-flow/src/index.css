@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-maroon-50: #fff5f5;
+  --color-maroon-100: #ffe3e3;
+  --color-maroon-200: #ffc9c9;
+  --color-maroon-300: #ffa8a8;
+  --color-maroon-400: #ff8787;
+  --color-maroon-500: #ff6b6b;
+  --color-maroon-600: #fa5252;
+  --color-maroon-700: #e03131;
+  --color-maroon-800: #c92a2a;
+  --color-maroon-900: #800000;
+}
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: #f9fafb;
+  --app-shell-bg: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  --app-panel-bg: rgba(255, 255, 255, 0.88);
+  --app-panel-muted: rgba(248, 250, 252, 0.92);
+  --app-border: rgba(148, 163, 184, 0.26);
+  --app-text: #0f172a;
+}
+
+/* Ensure the app takes up the full screen */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--app-shell-bg);
+  color: var(--app-text);
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+html.dark {
+  background-color: #05070a;
+  --app-shell-bg: linear-gradient(180deg, #05070a 0%, #0a0c14 100%);
+  --app-panel-bg: rgba(10, 12, 20, 0.9);
+  --app-panel-muted: rgba(15, 18, 29, 0.94);
+  --app-border: rgba(51, 65, 85, 0.48);
+  --app-text: #e2e8f0;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+}
+/* Fallback transition only on root surfaces, not every node */
+.theme-switching body,
+.theme-switching #root {
+  transition: background-color 220ms ease, color 220ms ease;
+}
+
+/* View Transition smooth crossfade */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .theme-switching,
+  .theme-switching *,
+  .theme-switching *::before,
+  .theme-switching *::after {
+    transition: none !important;
+  }
+}
