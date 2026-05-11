@@ -110,7 +110,7 @@ const ConsumableModal: React.FC<Props> = ({ item, onClose, onSave }) => {
           {/* Cost and Bulk Stock Grid */}
           <div className="grid grid-cols-4 gap-3 col-span-2">
             <div className="space-y-2 col-span-2 relative">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Unit Cost (e.g. PHP)</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Unit Cost (PHP)</label>
                 <div className="relative">
                     <DollarSign className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
                     <input type="number" step="0.01" required value={formData.unitCost} onChange={(e) => setFormData({...formData, unitCost: parseFloat(e.target.value)})} className="w-full bg-[#05070a] border border-slate-800 rounded-xl p-3.5 text-slate-300 outline-none" />

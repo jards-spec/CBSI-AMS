@@ -11,7 +11,8 @@ const LicenseModal = ({ license, onClose, onSave }) => {
     manufacturer: '',
     minQty: 2,
     total: 10,
-    avail: 10
+    avail: 10,
+    unitCost: 0,
   });
 
   useEffect(() => {
@@ -101,13 +102,25 @@ const LicenseModal = ({ license, onClose, onSave }) => {
             </div>
 
             {/* EXPIRATION DATE */}
-            <div className="space-y-2 col-span-2">
+            <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Contract Expiration</label>
               <input 
                 type="date" 
                 value={formData.expirationDate} 
                 onChange={(e) => setFormData({...formData, expirationDate: e.target.value})} 
                 className="w-full bg-[#05070a] border border-slate-800 rounded-2xl p-4 text-xs font-black text-white outline-none focus:border-red-600 transition-all uppercase"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Unit Cost (PHP)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.unitCost}
+                onChange={(e) => setFormData({ ...formData, unitCost: parseFloat(e.target.value) || 0 })}
+                className="w-full bg-[#05070a] border border-slate-800 rounded-2xl p-4 text-xs font-black text-white outline-none focus:border-red-600 transition-all"
               />
             </div>
           </div>

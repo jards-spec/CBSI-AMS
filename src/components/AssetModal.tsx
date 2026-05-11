@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Hash, Building, Landmark, DollarSign, Calendar, Package } from 'lucide-react';
+import { X, Plus, Hash, Building, DollarSign, Package } from 'lucide-react';
 
 interface Props {
   asset?: any;
@@ -11,7 +11,6 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
   const isEditing = !!asset;
   const [isCustomCategory, setIsCustomCategory] = useState(false);
 
-  // Expanded fields to match your reference screenshots
   const [formData, setFormData] = useState({
     name: '',
     category: 'Laptop',
@@ -48,10 +47,10 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-[#1e232f] border border-slate-700 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[95vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
+    <div className="fixed inset-0 z-150 flex items-center justify-center p-4 bg-[#020617]/90 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-[#0f121d] border border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
         
-        {/* HEADER */}
+        {/* HEADER - High Contrast UI */}
         <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-[#161b29] sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-600/10 rounded-lg">
@@ -61,13 +60,13 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
               {isEditing ? 'Update Asset Entry' : 'Register New Asset Unit'}
             </h2>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors p-2">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          {/* DEVICE NAME - FULL WIDTH */}
+        {/* YOUR ORIGINAL INPUT FIELDS - UNCHANGED */}
+        <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Device Name</label>
             <input 
@@ -80,7 +79,6 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* CATEGORY SELECT/INPUT */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Category</label>
@@ -114,7 +112,6 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
               )}
             </div>
 
-            {/* STATUS SELECT */}
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Initial Status</label>
               <select 
@@ -129,7 +126,6 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
               </select>
             </div>
 
-            {/* SERIAL NUMBER */}
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Serial Number</label>
               <div className="relative">
@@ -144,7 +140,6 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
               </div>
             </div>
 
-            {/* MODEL NUMBER */}
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Model Number</label>
               <input 
@@ -155,7 +150,6 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
               />
             </div>
 
-            {/* MANUFACTURER */}
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Manufacturer</label>
               <div className="relative">
@@ -169,9 +163,8 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
               </div>
             </div>
 
-            {/* UNIT COST */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Unit Cost (USD)</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Unit Cost (PHP)</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600" size={14} />
                 <input 
@@ -185,7 +178,6 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
             </div>
           </div>
 
-          {/* LOCATION */}
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Deployment Location</label>
             <input 
@@ -196,10 +188,19 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
             />
           </div>
 
-          {/* ACTIONS */}
+          {/* FOOTER ACTIONS - Moved inside form for clickability */}
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
-            <button type="button" onClick={onClose} className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase hover:text-white transition-colors">Abort</button>
-            <button type="submit" className="bg-red-600 px-10 py-3 rounded-xl text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2 hover:bg-red-500 shadow-lg shadow-red-900/40 active:scale-95 transition-all italic">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase hover:text-white transition-colors"
+            >
+              Abort
+            </button>
+            <button 
+              type="submit" 
+              className="bg-red-600 px-10 py-3 rounded-xl text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2 hover:bg-red-500 shadow-lg shadow-red-900/40 active:scale-95 transition-all italic"
+            >
                {isEditing ? 'Sync Changes' : 'Initialize Asset'}
             </button>
           </div>

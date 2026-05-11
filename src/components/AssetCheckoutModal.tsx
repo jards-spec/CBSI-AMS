@@ -1,148 +1,197 @@
-import React, { useState } from 'react';
-import { X, Calendar, User, Package, MapPin } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, User, Box, Calendar, Check, Search, Info } from 'lucide-react';
 
-export default function AssetCheckoutModal({ isOpen, onClose, item, employees, onConfirm }: any) {
-  const [checkoutTarget, setCheckoutTarget] = useState<'user' | 'asset' | 'location'>('user');
-  const [formData, setFormData] = useState({
-    user: '',
-    checkoutDate: new Date().toISOString().split('T')[0],
-    expectedCheckin: '',
-    notes: '',
-    status: 'Ready to Deploy'
-  });
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  item: any;
+  employees: any[];
+  assets?: any[];
+  onConfirm: (details: any) => void;
+}
 
-  if (!isOpen || !item) return null;
+const AssetCheckoutModal: React.FC<Props> = ({ isOpen, onClose, item, employees, assets, onConfirm }) => {
+  const [checkoutTo, setCheckoutTo] = useState<'user' | 'asset'>('user');
+  const [selectedTarget, setSelectedTarget] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [checkoutDate, setCheckoutDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expectedCheckinDate, setExpectedCheckinDate] = useState('');
+  const [notes, setNotes] = useState('');
+
+  // SEARCH LOGIC - Fixed 'undefined' crash by checking assets prop
+  const filteredOptions = useMemo(() => {
+    if (checkoutTo === 'user') {
+      return (employees || []).filter(emp => 
+        (emp.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (emp.department || '').toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    } else {
+      return (assets || []).filter(a => 
+        ((a.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (a.tag || '').toLowerCase().includes(searchTerm.toLowerCase())) &&
+        a.id !== item?.id
+      );
+    }
+  }, [searchTerm, checkoutTo, employees, assets, item]);
+
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[600] bg-black/80 flex items-start justify-center pt-10 px-4 overflow-y-auto backdrop-blur-sm">
-      <div className="bg-[#222d32] w-full max-w-4xl shadow-2xl rounded-t-md overflow-hidden mb-10 animate-in zoom-in-95">
+    <div className="fixed inset-0 z-150 flex items-center justify-center p-4 bg-[#020617]/95 backdrop-blur-md animate-in fade-in zoom-in duration-200">
+      <div className="bg-[#0f121d] border border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border-t-4 border-t-[#d946ef] flex flex-col max-h-[95vh]">
         
-        {/* Teal Header */}
-        <div className="bg-[#00c0ef] text-white px-4 py-3 flex justify-between items-center">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            Assets > {item.tag} ({item.model}) > Checkout Asset
-          </h2>
-          <button onClick={onClose} className="hover:text-black/30 transition-colors"><X size={20} /></button>
+        {/* HEADER */}
+        <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-[#161b29]">
+          <div>
+            <h2 className="text-white font-black uppercase italic tracking-tighter text-lg">
+              Asset Tag <span className="text-[#d946ef]">{item?.tag || 'N/A'}</span>
+            </h2>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Name: <span className="text-white">{item?.name}</span></span>
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Category: <span className="text-pink-500">{item?.category}</span></span>
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Model: <span className="text-white">{item?.modelNo || 'N/A'}</span></span>
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Status: <span className="text-emerald-500">{item?.status}</span></span>
+            </div>
+          </div>
+          <button onClick={onClose} type="button" className="text-slate-500 hover:text-white transition-colors p-2">
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Green Banner */}
-        <div className="bg-[#00a65a] text-white px-4 py-2 text-[11px] font-bold">
-          SYSTEM MODE: Active Asset Tracking.
+        {/* FORM BODY */}
+        <div className="p-8 space-y-6 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
+          
+          {/* CHECKOUT TO TOGGLE */}
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-[0.2em]">Checkout To</label>
+            <div className="flex gap-1 bg-slate-900/50 p-1 rounded-xl border border-slate-800 w-fit">
+              <button 
+                type="button"
+                onClick={() => { setCheckoutTo('user'); setSelectedTarget(''); setSearchTerm(''); }}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${checkoutTo === 'user' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                <User size={14} /> User
+              </button>
+              <button 
+                type="button"
+                onClick={() => { setCheckoutTo('asset'); setSelectedTarget(''); setSearchTerm(''); }}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${checkoutTo === 'asset' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                <Box size={14} /> Asset
+              </button>
+            </div>
+          </div>
+
+          {/* SEARCHABLE DROPDOWN */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-[0.2em]">
+              {checkoutTo === 'user' ? 'Select Personnel' : 'Select Target Asset'}
+            </label>
+            <div className="relative group">
+              <Search className="absolute left-4 top-4 text-slate-600 group-focus-within:text-[#d946ef] transition-colors" size={16} />
+              <input 
+                type="text"
+                placeholder={checkoutTo === 'user' ? "SEARCH EMPLOYEES..." : "SEARCH ASSETS BY NAME OR TAG..."}
+                className="w-full bg-slate-900 border border-slate-800 rounded-t-xl p-4 pl-12 text-[10px] font-black text-white outline-none focus:border-[#d946ef] uppercase tracking-widest placeholder:text-slate-700"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="bg-slate-900/80 border-x border-b border-slate-800 max-h-40 overflow-y-auto rounded-b-xl scrollbar-thin scrollbar-thumb-slate-700">
+                {filteredOptions.length > 0 ? (
+                  filteredOptions.map(option => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => {
+                        const val = checkoutTo === 'user' ? option.name : option.tag;
+                        setSelectedTarget(val);
+                        setSearchTerm(val);
+                      }}
+                      className={`w-full text-left p-3 text-[10px] font-bold uppercase transition-all flex justify-between items-center border-b border-slate-800/30 last:border-0 ${
+                        selectedTarget === (option.name || option.tag) ? 'bg-pink-600/20 text-pink-500' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                      }`}
+                    >
+                      <span>{option.name}</span>
+                      <span className="text-[8px] opacity-40 italic">{checkoutTo === 'user' ? option.department : option.tag}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-4 text-[9px] text-slate-600 text-center font-black italic">NO MATCHES FOUND</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-[0.2em]">Checkout Date</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
+                <input 
+                  type="date"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-3 text-white text-[10px] font-black outline-none focus:border-[#d946ef]"
+                  value={checkoutDate}
+                  onChange={(e) => setCheckoutDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-[0.2em]">Expected Checkin</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
+                <input 
+                  type="date"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-3 text-white text-[10px] font-black outline-none focus:border-[#d946ef]"
+                  value={expectedCheckinDate}
+                  onChange={(e) => setExpectedCheckinDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-[0.2em]">Notes</label>
+            <textarea 
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-white text-[10px] font-bold outline-none focus:border-[#d946ef] min-h-20 resize-none uppercase"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="ENTER ADDITIONAL DETAILS..."
+            />
+          </div>
+
+          <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 flex items-start gap-3">
+            <Info size={16} className="text-blue-400 mt-0.5 shrink-0" />
+            <p className="text-[9px] font-bold text-blue-400 uppercase tracking-tight leading-relaxed">
+              Notice: This user will be emailed with a link to confirm acceptance of this item.
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); onConfirm({ ...formData, checkoutTarget }); }} className="p-6 text-sm text-slate-300">
-          <div className="grid grid-cols-[220px_1fr] gap-y-5 items-center">
-            
-            <div className="text-right pr-6 font-bold text-slate-400 uppercase text-[10px]">Asset Tag</div>
-            <div className="font-bold text-white">{item.tag}</div>
-
-            <div className="text-right pr-6 font-bold text-slate-400 uppercase text-[10px]">Category</div>
-            <div className="flex items-center gap-2 text-slate-200">
-              <span className="w-3 h-3 bg-blue-500 inline-block"></span> {item.category || 'Desktops'}
-            </div>
-
-            <div className="text-right pr-6 font-bold text-slate-400 uppercase text-[10px]">Model</div>
-            <div className="text-slate-200 font-bold">{item.model}</div>
-
-            <div className="text-right pr-6 font-bold text-slate-400 uppercase text-[10px]">Status</div>
-            <div className="max-w-md">
-               <select 
-                value={formData.status} 
-                onChange={(e) => setFormData({...formData, status: e.target.value})}
-                className="bg-[#1e282c] border border-[#3c8dbc] text-white p-2 w-full rounded focus:outline-none focus:ring-1 focus:ring-white"
-              >
-                <option>Ready to Deploy</option>
-                <option>Pending</option>
-              </select>
-            </div>
-
-            <div className="text-right pr-6 font-bold text-slate-400 uppercase text-[10px]">Checkout to</div>
-            <div className="flex bg-[#1e282c] w-fit rounded overflow-hidden border border-slate-700">
-              <button 
-                type="button" 
-                onClick={() => setCheckoutTarget('user')} 
-                className={`px-4 py-2 flex items-center gap-2 transition-colors text-[11px] font-bold uppercase ${checkoutTarget === 'user' ? 'bg-[#3c8dbc] text-white' : 'text-slate-400 hover:bg-slate-700'}`}
-              >
-                <User size={12}/> User
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setCheckoutTarget('asset')} 
-                className={`px-4 py-2 flex items-center gap-2 transition-colors text-[11px] font-bold uppercase ${checkoutTarget === 'asset' ? 'bg-[#3c8dbc] text-white' : 'text-slate-400 hover:bg-slate-700'}`}
-              >
-                <Package size={12}/> Asset
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setCheckoutTarget('location')} 
-                className={`px-4 py-2 flex items-center gap-2 transition-colors text-[11px] font-bold uppercase ${checkoutTarget === 'location' ? 'bg-[#3c8dbc] text-white' : 'text-slate-400 hover:bg-slate-700'}`}
-              >
-                <MapPin size={12}/> Location
-              </button>
-            </div>
-
-            <div className="text-right pr-6 font-bold text-white uppercase text-[10px]">Selected User</div>
-            <div className="flex gap-2 max-w-md">
-              <select 
-                required 
-                onChange={(e) => setFormData({...formData, user: e.target.value})} 
-                className="bg-[#1e282c] border border-slate-700 text-white p-2 flex-1 rounded focus:outline-none focus:border-[#3c8dbc]"
-              >
-                <option value="">Select a User</option>
-                {employees.map((emp: any) => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
-              </select>
-              <button type="button" className="bg-[#3c8dbc] px-4 rounded font-bold text-white text-[10px] hover:bg-[#367fa9] uppercase">New</button>
-            </div>
-
-            <div className="text-right pr-6 font-bold text-slate-400 uppercase text-[10px]">Checkout Date</div>
-            <div className="flex max-w-md">
-              <input 
-                type="date" 
-                value={formData.checkoutDate} 
-                onChange={(e) => setFormData({...formData, checkoutDate: e.target.value})} 
-                className="bg-[#1e282c] border border-slate-700 text-white p-2 flex-1 focus:outline-none focus:border-[#3c8dbc]" 
-              />
-              <div className="bg-[#eee] text-black p-2 border border-[#ccc] rounded-r"><Calendar size={16}/></div>
-            </div>
-
-            <div className="text-right pr-6 font-bold text-slate-400 uppercase text-[10px]">Expected Checkin</div>
-            <div className="flex max-w-md">
-              <input 
-                type="date" 
-                value={formData.expectedCheckin} 
-                onChange={(e) => setFormData({...formData, expectedCheckin: e.target.value})} 
-                className="bg-[#1e282c] border border-slate-700 text-white p-2 flex-1 focus:outline-none focus:border-[#3c8dbc]" 
-              />
-              <div className="bg-[#eee] text-black p-2 border border-[#ccc] rounded-r"><Calendar size={16}/></div>
-            </div>
-
-            <div className="text-right pr-6 font-bold text-slate-400 uppercase text-[10px] self-start pt-2">Notes</div>
-            <div className="max-w-md">
-              <textarea 
-                rows={3} 
-                onChange={(e) => setFormData({...formData, notes: e.target.value})} 
-                className="bg-[#1e282c] border border-slate-700 border-r-[6px] border-r-[#f39c12] text-white p-2 w-full rounded focus:outline-none focus:border-[#3c8dbc]" 
-                placeholder="Notes regarding this checkout..."
-              />
-            </div>
-          </div>
-
-          <div className="mt-8 bg-[#00c0ef] text-white p-3 rounded font-bold text-[11px] space-y-1">
-            <div className="flex items-center gap-2"><input type="checkbox" defaultChecked /> This user will be emailed with a link to confirm acceptance of this item.</div>
-            <div className="flex items-center gap-2"><input type="checkbox" defaultChecked /> This user will be emailed a copy of the EULA.</div>
-          </div>
-
-          <div className="mt-8 flex justify-between items-center border-t border-slate-700 pt-6">
-            <button type="button" onClick={onClose} className="text-[#3c8dbc] hover:underline font-bold uppercase text-xs">Cancel</button>
-            <div className="flex gap-2">
-              <button type="button" onClick={onClose} className="bg-[#444] hover:bg-[#555] text-white px-4 py-2 rounded text-xs font-bold uppercase">Return to all Assets</button>
-              <button type="submit" className="bg-[#00a65a] hover:bg-[#008d4c] text-white px-8 py-2 rounded font-bold flex items-center gap-2 text-xs uppercase shadow-lg shadow-emerald-900/40 transition-colors">
-                ✓ Checkout
-              </button>
-            </div>
-          </div>
-        </form>
+        {/* ACTIONS */}
+        <div className="p-6 border-t border-slate-800 bg-[#161b29] flex justify-between items-center">
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase hover:text-white transition-colors italic"
+          >
+            Cancel
+          </button>
+          <button 
+            type="button"
+            disabled={!selectedTarget}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onConfirm({ selectedTarget, checkoutTo, checkoutDate, expectedCheckinDate, notes });
+            }}
+            className="bg-emerald-600 px-10 py-3 rounded-xl text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-500 shadow-lg shadow-emerald-900/40 active:scale-95 transition-all italic disabled:opacity-30 disabled:grayscale"
+          >
+            <Check size={16} strokeWidth={3} /> Checkout
+          </button>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default AssetCheckoutModal;

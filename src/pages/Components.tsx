@@ -1,317 +1,647 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Cpu, Plus, Search, Edit2, Trash2, Box, Package2, BadgeDollarSign, 
-  X, Save, User, Bell, HardDrive, Layout, Activity
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Plus,
+  Search,
+  Edit2,
+  Copy,
+  Package,
+  X,
+  CheckCircle2,
+  Monitor,
+  Archive,
+  RotateCcw,
 } from 'lucide-react';
-import { useAudit } from '../context/AuditContext';
-import { useTransaction } from '../hooks/useTransaction';
 import { cn } from '../lib/utils';
+import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import TransactionModal from '../components/TransactionModal';
 
-interface ComponentItem {
-  id: string;
-  name: string;
-  category: string;
-  quantity: number;
-  minQty: number;
-  serial: string;
-  manufacturer: string;
-  location: string;
-  unitCost: number;
-  remaining: number;
-  notes?: string;
-}
+type Scope = 'active' | 'archived' | 'all';
+
+const defaultForm = {
+  name: '',
+  category: 'MEMORY (RAM)',
+  model: '',
+  location: '',
+  total: '',
+  minQty: '',
+};
 
 const Components = () => {
-  const { addLog } = useAudit();
-  const { checkoutItem: processTransaction } = useTransaction();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [checkoutItem, setCheckoutItem] = useState<ComponentItem | null>(null);
+  const { currentUser } = useAuth();
+
+  const [items, setItems] = useState<any[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [activeAssignments, setActiveAssignments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [scope, setScope] = useState<Scope>('active');
 
-  // Pull dynamic employees for the checkout dropdown
-  const [employees] = useState(() => {
-    const saved = localStorage.getItem('ams_employees');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'W. Del Rosario', department: 'MIS' },
-      { id: '2', name: 'J. Doe', department: 'HR' },
-      { id: '3', name: 'Clint Perlas', department: 'ENG' }
-    ];
-  });
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [modalMode, setModalMode] = useState<'checkin' | 'checkout' | null>(null);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
 
-  const [components, setComponents] = useState<ComponentItem[]>(() => {
-    const saved = localStorage.getItem('ams_consumables');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [formData, setFormData] = useState(defaultForm);
 
-  const [formData, setFormData] = useState<Partial<ComponentItem>>({
-    category: 'RAM',
-    location: '',
-    manufacturer: '',
-  });
+  const refresh = async (nextScope: Scope = scope) => {
+    setLoading(true);
+    try {
+      const [componentRows, assetRows] = await Promise.all([
+        api.components.list(nextScope),
+        api.assets.list('active'),
+      ]);
 
-  // Keep your exact analytics logic
-  const { lowStockCount, totalValuation, filteredComponents } = useMemo(() => {
-    const filtered = components.filter(c => 
-      c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.serial?.toLowerCase().includes(searchQuery.toLowerCase())
+      setItems(Array.isArray(componentRows) ? componentRows : []);
+      setAssets(Array.isArray(assetRows) ? assetRows : []);
+    } catch (err) {
+      console.error('Failed to load components:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refresh(scope);
+  }, [scope]);
+
+  const loadAssignmentsForItem = async (itemId: string | number) => {
+    try {
+      const rows = await api.components.assignments(itemId, 'active');
+      setActiveAssignments(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      console.error('Failed to load component assignments:', error);
+      setActiveAssignments([]);
+    }
+  };
+
+  const openCreate = () => {
+    setEditingItem(null);
+    setIsCustomCategory(false);
+    setFormData(defaultForm);
+    setIsRegisterOpen(true);
+  };
+
+  const openEdit = (item: any) => {
+    setEditingItem(item);
+    setIsCustomCategory(
+      ![
+        'MEMORY (RAM)',
+        'STORAGE (SSD/HDD)',
+        'GPU',
+        'CPU',
+        'POWER',
+        'COOLING',
+        'NETWORKING',
+      ].includes(item.category),
     );
 
-    const lowStock = components.filter(c => Number(c.remaining) <= Number(c.minQty)).length;
-    const valuation = components.reduce((sum, c) => sum + (Number(c.remaining) * (Number(c.unitCost) || 0)), 0);
-
-    return { 
-      lowStockCount: lowStock, 
-      totalValuation: valuation.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-      filteredComponents: filtered 
-    };
-  }, [components, searchQuery]);
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newItem = {
-      ...formData,
-      id: Date.now().toString(),
-      remaining: Number(formData.quantity) || 0,
-      quantity: Number(formData.quantity) || 0,
-    } as ComponentItem;
-
-    const updated = [newItem, ...components];
-    setComponents(updated);
-    localStorage.setItem('ams_consumables', JSON.stringify(updated));
-    addLog('ADDED', 'Admin', 'COMPONENT', `New component registered: ${newItem.name} (SN-${newItem.serial})`);
-    setIsModalOpen(false);
-  };
-
-  // Updated to use the useTransaction hook while keeping your UI flow
-  const handleCheckout = (employeeName: string) => {
-    if (!checkoutItem || !employeeName) return;
-    
-    const updated = processTransaction(checkoutItem, 'consumables', {
-      user: employeeName,
-      date: new Date().toISOString(),
-      qty: 1
+    setFormData({
+      name: item.name || '',
+      category: item.category || 'MEMORY (RAM)',
+      model: item.model || '',
+      location: item.location || '',
+      total: String(item.total ?? ''),
+      minQty: String(item.minQty ?? ''),
     });
 
-    setComponents(updated);
-    setCheckoutItem(null);
+    setIsRegisterOpen(true);
   };
 
-  const getTypeIcon = (cat: string) => {
-    const c = cat?.toLowerCase();
-    if (c?.includes('ssd') || c?.includes('hdd') || c?.includes('storage')) return <HardDrive size={18} />;
-    if (c?.includes('ram') || c?.includes('memory')) return <Layout size={18} />;
-    if (c?.includes('gpu') || c?.includes('video')) return <Activity size={18} />;
-    return <Cpu size={18} />;
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const payload = {
+      name: formData.name,
+      category: formData.category,
+      model: formData.model,
+      location: formData.location,
+      total: Number(formData.total || 0),
+      minQty: Number(formData.minQty || 0),
+      unitCost: editingItem?.unitCost ?? 0,
+      status: editingItem?.status ?? 'AVAILABLE',
+      remaining: editingItem?.remaining ?? Number(formData.total || 0),
+      assignedTo: editingItem?.assignedTo ?? null,
+      checkoutDate: editingItem?.checkoutDate ?? null,
+      expectedCheckinDate: editingItem?.expectedCheckinDate ?? null,
+      notes: editingItem?.notes ?? null,
+    };
+
+    try {
+      if (editingItem) {
+        await api.components.update(editingItem.id, payload);
+      } else {
+        await api.components.create(payload);
+      }
+
+      setIsRegisterOpen(false);
+      setEditingItem(null);
+      setIsCustomCategory(false);
+      setFormData(defaultForm);
+      await refresh();
+    } catch (error: any) {
+      alert(error.message);
+    }
   };
+
+  const handleClone = async (item: any) => {
+    try {
+      await api.components.create({
+        name: `${item.name} (COPY)`,
+        category: item.category,
+        model: item.model,
+        location: item.location,
+        total: Number(item.total || 0),
+        minQty: Number(item.minQty || 0),
+        unitCost: Number(item.unitCost || 0),
+      });
+      await refresh();
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  const handleArchive = async (item: any) => {
+    if (!window.confirm(`Archive ${item.name}?`)) return;
+    try {
+      await api.components.archive(item.id, {
+        archivedById: currentUser?.id,
+        archivedByName: currentUser?.name,
+      });
+      await refresh();
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  const handleRestore = async (item: any) => {
+    try {
+      await api.components.restore(item.id, {
+        archivedById: currentUser?.id,
+        archivedByName: currentUser?.name,
+      });
+      await refresh();
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  const openTransaction = async (item: any, mode: 'checkout' | 'checkin') => {
+    setSelectedItem(item);
+    setModalMode(mode);
+
+    if (mode === 'checkin' || mode === 'checkout') {
+      await loadAssignmentsForItem(item.id);
+    }
+  };
+
+  const handleTransactionSubmit = async (payload: any) => {
+    if (!modalMode || !selectedItem) return;
+
+    try {
+      if (modalMode === 'checkout') {
+        await api.transactions.checkout({
+          ...payload,
+          assignedById: currentUser?.id,
+          assignedByName: currentUser?.name,
+        });
+      } else {
+        await api.transactions.checkin({
+          ...payload,
+          assignedById: currentUser?.id,
+          assignedByName: currentUser?.name,
+        });
+      }
+
+      setModalMode(null);
+      setSelectedItem(null);
+      setActiveAssignments([]);
+      await refresh();
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  const getStatusStyle = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case 'AVAILABLE':
+        return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
+      case 'DEPLOYED':
+        return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+      default:
+        return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
+    }
+  };
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) =>
+      [item.name, item.model, item.category, item.location]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(searchQuery.toLowerCase())),
+    );
+  }, [items, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="animate-pulse text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+          Syncing Component Registry...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-20">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <h1 className="text-3xl font-black text-white uppercase tracking-tighter flex items-center gap-3 italic">
-            <Box className="text-red-600" size={28} />
-            Hardware <span className="text-red-600">Components</span>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Components
           </h1>
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-1 italic">
-            Part Registry // {components.length} Line Items Indexed
+          <p className="mt-1 text-xs font-medium uppercase tracking-widest text-slate-600 italic dark:text-slate-500">
+            Management Console // {items.length} Units Indexed
           </p>
         </div>
-        
-        <div className="flex items-center gap-3">
-          {lowStockCount > 0 && (
-            <div className="bg-red-600/10 border border-red-600/20 px-4 py-2.5 rounded-xl flex items-center gap-2 animate-pulse">
-              <Bell className="text-red-600" size={14} />
-              <span className="text-[9px] font-black text-red-500 uppercase tracking-widest">{lowStockCount} LOW STOCK ALERTS</span>
-            </div>
-          )}
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#10b981] hover:bg-[#059669] text-white font-black py-3 px-6 rounded-xl text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-emerald-900/20 italic"
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-800 dark:bg-[#0f121d]">
+            {(['active', 'archived', 'all'] as Scope[]).map((value) => (
+              <button
+                key={value}
+                onClick={() => setScope(value)}
+                className={cn(
+                  'rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wider transition-all',
+                  scope === value
+                    ? 'bg-red-600 text-white'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-500 dark:hover:text-white',
+                )}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={14} />
+            <input
+              type="text"
+              placeholder="Filter components..."
+              className="w-64 rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs text-slate-900 outline-none transition-all focus:border-red-600 dark:border-slate-800 dark:bg-[#0f121d] dark:text-white"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-all hover:bg-red-700"
           >
-            <Plus size={18} strokeWidth={3} /> New Component
+            <Plus size={16} strokeWidth={3} /> Register Component
           </button>
         </div>
       </div>
 
-      {/* QUICK ANALYTICS STRIP */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-[#0f121d] border border-slate-800 p-4 rounded-2xl flex items-center gap-4">
-          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-500"><Package2 size={20} /></div>
-          <div>
-            <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Total Units in Stock</p>
-            <p className="text-xl font-black text-white italic">{components.reduce((a, b) => a + Number(b.remaining), 0)}</p>
-          </div>
-        </div>
-        <div className="bg-[#0f121d] border border-slate-800 p-4 rounded-2xl flex items-center gap-4">
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500"><BadgeDollarSign size={20} /></div>
-          <div>
-            <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Estimated Valuation</p>
-            <p className="text-xl font-black text-white italic">₱{totalValuation}</p>
-          </div>
-        </div>
-        <div className="bg-[#0f121d] border border-slate-800 p-4 rounded-2xl flex items-center px-4">
-          <div className="relative w-full">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-            <input 
-              type="text" 
-              placeholder="SEARCH BY NAME / SERIAL..."
-              className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-3.5 pl-12 text-[10px] font-black text-white placeholder:text-slate-700 uppercase tracking-[0.2em] focus:border-emerald-500 outline-none transition-all"
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* DATA TABLE */}
-      <div className="bg-[#0f121d] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-        <table className="w-full text-left border-collapse">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-[#0f121d] dark:shadow-2xl">
+        <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="bg-[#161b29] border-b border-slate-800">
-              <th className="p-5 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Hardware Details</th>
-              <th className="p-5 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] text-center">Serial Number</th>
-              <th className="p-5 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Stock Availability</th>
-              <th className="p-5 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] text-center">Unit Cost</th>
-              <th className="p-5 text-right text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Manage</th>
+            <tr className="border-b border-slate-200 bg-slate-100 text-[9px] font-black uppercase tracking-widest text-slate-600 dark:border-slate-800 dark:bg-[#161b22] dark:text-slate-500">
+              <th className="px-6 py-5">Component Details</th>
+              <th className="px-6 py-5">Category / Model</th>
+              <th className="px-6 py-5">Status</th>
+              <th className="px-6 py-5">Stock</th>
+              <th className="px-6 py-5 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/40">
-            {filteredComponents.map((item) => {
-              const isLow = item.remaining <= item.minQty;
+
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-800/30">
+            {filteredItems.map((item) => {
+              const isArchived = Number(item.isArchived || 0) === 1;
+
               return (
-                <tr key={item.id} className="hover:bg-white/[0.02] transition-colors group">
-                  <td className="p-5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center text-red-500 border border-slate-800 group-hover:border-emerald-500/50 transition-all shadow-inner">
-                        {getTypeIcon(item.category)}
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-white uppercase italic tracking-tight group-hover:text-emerald-500 transition-colors">{item.name}</div>
-                        <div className="text-[8px] text-slate-500 font-black uppercase tracking-widest mt-0.5">{item.category} // {item.location}</div>
-                      </div>
+                <tr
+                  key={item.id}
+                  className={cn(
+                    'group text-[11px] transition-colors hover:bg-slate-50 dark:hover:bg-white/1',
+                    isArchived && 'opacity-70',
+                  )}
+                >
+                  <td className="px-6 py-5">
+                    <div className="font-bold uppercase italic tracking-tighter text-slate-900 transition-colors group-hover:text-cyan-600 dark:text-white dark:group-hover:text-cyan-400">
+                      {item.name}
+                    </div>
+                    <div className="mt-1 text-[9px] uppercase text-slate-500 dark:text-slate-600">
+                      {item.location || '—'}
                     </div>
                   </td>
-                  <td className="p-5 text-center font-mono text-[10px] text-slate-400">{item.serial}</td>
-                  <td className="p-5 w-56">
-                    <div className="flex justify-between text-[8px] font-black uppercase mb-1.5 italic">
-                      <span className={cn(isLow ? "text-red-500 animate-pulse" : "text-emerald-500")}>
-                        {item.remaining} {isLow ? 'CRITICAL STOCK' : 'AVAILABLE'}
-                      </span>
-                      <span className="text-slate-600">{Math.round((item.remaining / (item.quantity || 1)) * 100)}%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                      <div 
-                        className={cn("h-full transition-all duration-1000", 
-                          isLow ? "bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.5)]" : "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
-                        )} 
-                        style={{ width: `${(item.remaining / (item.quantity || 1)) * 100}%` }}
-                      />
+
+                  <td className="px-6 py-5 font-bold uppercase tracking-tighter text-slate-700 dark:text-slate-400">
+                    <div>{item.category}</div>
+                    <div className="mt-1 text-[9px] italic text-slate-500 dark:text-slate-600">
+                      {item.model || '—'}
                     </div>
                   </td>
-                  <td className="p-5 text-center font-black text-white italic text-xs">₱{Number(item.unitCost).toLocaleString()}</td>
-                  <td className="p-5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button 
-                        onClick={() => setCheckoutItem(item)}
-                        disabled={item.remaining === 0}
+
+                  <td className="px-6 py-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
                         className={cn(
-                          "px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all italic",
-                          item.remaining > 0 ? "bg-pink-600 text-white hover:bg-pink-700 shadow-lg shadow-pink-900/20" : "bg-slate-800 text-slate-600 cursor-not-allowed"
+                          'inline-block rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest',
+                          getStatusStyle(item.status),
                         )}
                       >
-                        Checkout
-                      </button>
-                      <button className="p-2 bg-slate-900 border border-slate-800 text-slate-400 rounded-lg hover:text-white transition-colors group-hover:border-slate-700"><Edit2 size={14} /></button>
+                        {item.status || 'AVAILABLE'}
+                      </span>
+                      {isArchived ? (
+                        <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-amber-500">
+                          Archived
+                        </span>
+                      ) : null}
+                    </div>
+                    {item.assignedTo ? (
+                      <div className="mt-2 text-[9px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-600">
+                        {item.assignedTo}
+                      </div>
+                    ) : null}
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <div className="font-bold text-slate-900 dark:text-white">
+                      {item.remaining ?? item.total}
+                      <span className="font-normal text-slate-500 dark:text-slate-600"> / {item.total}</span>
+                    </div>
+                    <div className="mt-0.5 text-[9px] uppercase text-slate-500 dark:text-slate-600">
+                      Min: {item.minQty ?? 0}
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-5 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      {!isArchived ? (
+                        <button
+                          onClick={() =>
+                            openTransaction(item, item.status === 'DEPLOYED' ? 'checkin' : 'checkout')
+                          }
+                          className="rounded bg-[#d63384] px-4 py-1.5 text-[9px] font-black uppercase tracking-tighter text-white shadow-lg shadow-pink-900/10 transition-all hover:bg-[#b52a6f]"
+                        >
+                          {item.status === 'DEPLOYED' ? 'Remove' : 'Install'}
+                        </button>
+                      ) : null}
+
+                      <div className="flex items-center gap-1.5">
+                        {!isArchived ? (
+                          <>
+                            <button
+                              onClick={() => handleClone(item)}
+                              className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-2 text-cyan-500 transition-all hover:bg-cyan-500 hover:text-white"
+                            >
+                              <Copy size={12} strokeWidth={3} />
+                            </button>
+
+                            <button
+                              onClick={() => openEdit(item)}
+                              className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-2 text-orange-500 transition-all hover:bg-orange-500 hover:text-white"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+
+                            <button
+                              onClick={() => handleArchive(item)}
+                              className="rounded-lg border border-red-600/20 bg-red-600/10 p-2 text-red-600 transition-all hover:bg-red-600 hover:text-white"
+                            >
+                              <Archive size={12} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleRestore(item)}
+                            className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2 text-emerald-500 transition-all hover:bg-emerald-500 hover:text-white"
+                          >
+                            <RotateCcw size={12} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>
               );
             })}
+
+            {filteredItems.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-6 py-20 text-center text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-600"
+                >
+                  No components found
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
 
-      {/* RE-STYLED REGISTER MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in zoom-in-95 duration-300">
-          <div className="bg-[#1e232f] border border-slate-700 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-[#161b29]">
-              <h2 className="text-sm font-black text-white uppercase tracking-widest italic">Part Entry Terminal</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white transition-colors"><X size={20} /></button>
+      {isRegisterOpen ? (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f121d]">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100 p-6 dark:border-slate-800 dark:bg-[#161b29]">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-red-600/10 p-2">
+                  <Package className="text-red-600" size={18} />
+                </div>
+                <h3 className="text-sm font-black uppercase italic tracking-tight text-slate-900 dark:text-white">
+                  {editingItem ? 'Edit Component' : 'Register Component'}
+                </h3>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsRegisterOpen(false);
+                  setEditingItem(null);
+                  setFormData(defaultForm);
+                }}
+                className="text-slate-500 transition-colors hover:text-slate-900 dark:hover:text-white"
+              >
+                <X size={20} />
+              </button>
             </div>
-            <form onSubmit={handleSave} className="p-8 space-y-6">
-               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase italic">Component Name</label>
-                <input required className="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 text-white text-xs outline-none focus:border-emerald-500 transition-all font-bold" placeholder="e.g. Kingston Fury 32GB Kit" onChange={e => setFormData({...formData, name: e.target.value})} />
+
+            <form onSubmit={handleSave} className="space-y-4 p-6">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+                  Component Name
+                </label>
+                <input
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-bold uppercase text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-red-600 dark:border-slate-800 dark:bg-[#161b29] dark:text-white dark:placeholder:text-slate-700"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. 16GB RAM MODULE"
+                />
               </div>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase italic">Category</label>
-                  <select className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-[10px] font-black uppercase outline-none focus:border-emerald-500" onChange={e => setFormData({...formData, category: e.target.value})}>
-                    <option value="RAM">RAM</option>
-                    <option value="HDD/SSD">HDD/SSD</option>
-                    <option value="Peripherals">Peripherals</option>
-                    <option value="Network">Network</option>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+                    Category
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomCategory(!isCustomCategory);
+                      setFormData({ ...formData, category: isCustomCategory ? 'MEMORY (RAM)' : '' });
+                    }}
+                    className="text-[8px] font-bold uppercase text-red-500 hover:text-red-400"
+                  >
+                    {isCustomCategory ? 'Select Existing' : '+ Custom'}
+                  </button>
+                </div>
+
+                {isCustomCategory ? (
+                  <input
+                    required
+                    className="w-full rounded-xl border border-red-300 bg-slate-50 p-3 text-xs font-bold uppercase text-slate-900 outline-none focus:border-red-600 dark:border-red-900/50 dark:bg-[#161b29] dark:text-white"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value.toUpperCase() })}
+                    placeholder="TYPE CATEGORY NAME..."
+                    autoFocus
+                  />
+                ) : (
+                  <select
+                    className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-bold uppercase text-slate-900 outline-none focus:border-red-600 dark:border-slate-800 dark:bg-[#161b29] dark:text-white"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  >
+                    <option>MEMORY (RAM)</option>
+                    <option>STORAGE (SSD/HDD)</option>
+                    <option>GPU</option>
+                    <option>CPU</option>
+                    <option>POWER</option>
+                    <option>COOLING</option>
+                    <option>NETWORKING</option>
                   </select>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+                    Model No.
+                  </label>
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 outline-none focus:border-red-600 dark:border-slate-800 dark:bg-[#161b29] dark:text-white"
+                    value={formData.model}
+                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                    placeholder="e.g. DDR4-3200"
+                  />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase italic">Serial No</label>
-                  <input className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-xs font-mono outline-none focus:border-emerald-500" placeholder="SN-..." onChange={e => setFormData({...formData, serial: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase italic">Quantity</label>
-                  <input type="number" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-xs font-bold outline-none focus:border-emerald-500" onChange={e => setFormData({...formData, quantity: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase italic">Unit Cost (₱)</label>
-                  <input type="number" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-xs font-bold outline-none focus:border-emerald-500" onChange={e => setFormData({...formData, unitCost: Number(e.target.value)})} />
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+                    Location
+                  </label>
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 outline-none focus:border-red-600 dark:border-slate-800 dark:bg-[#161b29] dark:text-white"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="e.g. MIS Storage Room"
+                  />
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase hover:text-white">Abort</button>
-                <button type="submit" className="bg-[#10b981] px-10 py-3 rounded-xl text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2 hover:bg-[#059669] shadow-lg shadow-emerald-900/30">
-                  <Save size={16} /> Finalize Entry
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+                    Total Stock
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 outline-none focus:border-red-600 dark:border-slate-800 dark:bg-[#161b29] dark:text-white"
+                    value={formData.total}
+                    onChange={(e) => setFormData({ ...formData, total: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+                    Min Qty Alert
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 outline-none focus:border-red-600 dark:border-slate-800 dark:bg-[#161b29] dark:text-white"
+                    value={formData.minQty}
+                    onChange={(e) => setFormData({ ...formData, minQty: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegisterOpen(false);
+                    setEditingItem(null);
+                    setFormData(defaultForm);
+                  }}
+                  className="flex-1 rounded-xl border border-slate-200 py-3 text-[10px] font-black uppercase text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:text-slate-500 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-xl bg-red-600 py-3 text-[10px] font-black uppercase text-white shadow-lg shadow-red-600/20 transition-colors hover:bg-red-700"
+                >
+                  {editingItem ? 'Update' : 'Register'}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* CHECKOUT MODAL */}
-      {checkoutItem && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-          <div className="bg-[#0f121d] border border-slate-800 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-pink-600/10 border border-pink-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <User className="text-pink-600" size={32} />
-              </div>
-              <h3 className="text-lg font-black text-white uppercase tracking-tighter italic">Confirm Deployment</h3>
-              <p className="text-slate-500 text-[9px] uppercase font-bold tracking-widest mt-1">Assigning: {checkoutItem.name}</p>
+      <TransactionModal
+        isOpen={!!modalMode && !!selectedItem}
+        mode={modalMode || 'checkout'}
+        resourceType="component"
+        item={selectedItem}
+        assets={assets}
+        activeAssignments={activeAssignments}
+        loading={loading}
+        onClose={() => {
+          setModalMode(null);
+          setSelectedItem(null);
+          setActiveAssignments([]);
+        }}
+        onSubmit={handleTransactionSubmit}
+      />
+
+      {modalMode === 'checkin' && selectedItem && activeAssignments.length === 0 ? (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-[2rem] border border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-[#0f121d]">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-500">
+              <CheckCircle2 size={32} />
             </div>
-            
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] italic ml-1">Assign to Custodian</label>
-                <select id="emp-select" className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 text-white text-xs font-bold outline-none focus:border-pink-500 appearance-none cursor-pointer">
-                  {employees.map((emp: any) => (
-                    <option key={emp.id} value={emp.name}>{emp.name} ({emp.department})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => setCheckoutItem(null)} className="flex-1 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white">Cancel</button>
-                <button 
-                  onClick={() => handleCheckout((document.getElementById('emp-select') as HTMLSelectElement).value)}
-                  className="flex-1 bg-pink-600 py-4 rounded-xl text-[10px] font-black text-white uppercase tracking-widest shadow-lg shadow-pink-900/40 hover:bg-pink-500 transition-all active:scale-95 italic"
-                >
-                  Verify Checkout
-                </button>
-              </div>
+            <h2 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white">
+              No Active Assignment
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-500">
+              This component is marked deployed, but no active asset assignment was found.
+            </p>
+            <div className="mt-8">
+              <button
+                onClick={() => {
+                  setModalMode(null);
+                  setSelectedItem(null);
+                  setActiveAssignments([]);
+                }}
+                className="rounded-xl bg-amber-500 px-6 py-3 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-amber-600"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

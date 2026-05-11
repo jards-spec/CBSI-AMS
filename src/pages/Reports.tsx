@@ -1,60 +1,68 @@
 import React, { useState } from 'react';
-import { Package, ShieldCheck, ListChecks, History, Printer, Filter } from 'lucide-react';
+import { cn } from '../lib/utils';
+import LicenseComplianceReport from './reports/LicenseComplianceReport';
+import AssetValuationReport from './reports/AssetValuationReport';
+import DepartmentAllocationReport from './reports/DepartmentAllocationReport';
+import MaintenanceCostReport from './reports/MaintenanceCostReport';
+import EmployeeAssetHistoryReport from './reports/EmployeeAssetHistoryReport';
+import UnconfirmedAssignmentsReport from './reports/UnconfirmedAssignmentsReport';
+import { ShieldCheck, Package, Users, Wrench, UserCheck, Bell } from 'lucide-react';
 
 const Reports = () => {
-  const [activeTab, setActiveTab] = useState('Inventory');
+  const [activeTab, setActiveTab] = useState<'license' | 'asset' | 'department' | 'maintenance' | 'employee' | 'unconfirmed'>('license');
+  
   const tabs = [
-    { id: 'Inventory', icon: Package },
-    { id: 'Licenses', icon: ShieldCheck },
-    { id: 'Consumables', icon: ListChecks },
-    { id: 'Audit', icon: History }
-  ];
+  { id: 'license', label: 'License Compliance', icon: ShieldCheck },
+  { id: 'asset', label: 'Asset Valuation', icon: Package },
+  { id: 'department', label: 'Department Allocation', icon: Users },
+  { id: 'maintenance', label: 'Maintenance Cost', icon: Wrench },
+  { id: 'employee', label: 'Employee History', icon: UserCheck },
+  { id: 'unconfirmed', label: 'Unconfirmed', icon: Bell },
+] as const;
 
   return (
-    <div className="p-10 bg-[#05070a] min-h-screen text-slate-300">
-      <div className="flex justify-between items-end mb-10 print:hidden">
-        <div>
-          <h2 className="text-3xl font-black text-white uppercase tracking-tighter">System Reports</h2>
-          <div className="flex gap-4 mt-6">
-            {tabs.map(tab => (
-              <button 
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${activeTab === tab.id ? 'bg-red-600 border-red-500 text-white' : 'bg-[#0f121d] border-slate-800 text-slate-500 hover:text-white'}`}
-              >
-                <tab.icon size={14} /> {tab.id}
-              </button>
-            ))}
+    <div className="min-h-screen">
+      {/* Header */}
+      <div className="mb-6 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Reports
+            </h1>
+            <p className="mt-1 text-xs italic text-slate-600 dark:text-slate-500">
+              Comprehensive analytics and insights for asset management.
+            </p>
           </div>
         </div>
-        <button onClick={() => window.print()} className="bg-white text-black px-8 py-4 rounded-2xl font-black uppercase text-xs flex items-center gap-2 shadow-xl transition-all hover:bg-slate-200 active:scale-95">
-          <Printer size={18} /> Generate Hardcopy
-        </button>
+
+        {/* Report Tabs */}
+        <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'flex items-center gap-2 rounded-xl px-5 py-3 text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap',
+                activeTab === tab.id
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700',
+              )}
+            >
+              <tab.icon size={14} strokeWidth={3} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="bg-[#0f121d] border border-slate-800 rounded-3xl overflow-hidden print:border-none print:bg-white print:text-black">
-        <div className="p-8 border-b border-slate-800 flex justify-between items-center print:border-black">
-          <span className="text-sm font-black uppercase tracking-widest">{activeTab} Master List</span>
-          <span className="text-[10px] font-mono opacity-50 uppercase">As of {new Date().toLocaleDateString()}</span>
-        </div>
-        <table className="w-full text-left">
-          <thead className="bg-[#161b29] text-[10px] font-black uppercase text-slate-500 print:bg-slate-100 print:text-black">
-            <tr>
-              <th className="p-6">Line Item / Asset</th>
-              <th className="p-6">Category</th>
-              <th className="p-6">Reference No.</th>
-              <th className="p-6 text-right">Valuation / Cost</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/50 print:divide-black">
-            <tr className="hover:bg-white/5 transition-colors">
-              <td className="p-6 font-bold text-white uppercase print:text-black italic">HP LaserJet 107a Toner</td>
-              <td className="p-6 text-[10px] font-black uppercase text-red-500">{activeTab}</td>
-              <td className="p-6 font-mono text-slate-500">PO-2026-99</td>
-              <td className="p-6 text-right font-black text-white print:text-black">₱ 3,450.00</td>
-            </tr>
-          </tbody>
-        </table>
+      {/* Report Content */}
+      <div className="animate-in fade-in duration-500">
+      {activeTab === 'license' && <LicenseComplianceReport />}
+{activeTab === 'asset' && <AssetValuationReport />}
+{activeTab === 'department' && <DepartmentAllocationReport />}
+{activeTab === 'maintenance' && <MaintenanceCostReport />}
+{activeTab === 'employee' && <EmployeeAssetHistoryReport />}
+{activeTab === 'unconfirmed' && <UnconfirmedAssignmentsReport />}
       </div>
     </div>
   );
