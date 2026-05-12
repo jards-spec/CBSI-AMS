@@ -16,8 +16,23 @@ const {
 
 const app = express();
 
+// CORS - Allow all origins for development
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+const helmet = require('helmet');
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
 
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -148,6 +163,29 @@ const sanitizeEmployee = (row) => {
     ...safe,
     phone: phoneEnc ? decryptString(phoneEnc) : (row.phone || ''),
     jobTitle: jobTitleEnc ? decryptString(jobTitleEnc) : (row.jobTitle || ''),
+  };
+};
+
+// Password strength validation
+const validatePasswordStrength = (password) => {
+  const errors = [];
+  
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters');
+  }
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  }
+  if (!/[0-9]/.test(password)) {
+    errors.push('Password must contain at least one number');
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
   };
 };
 
@@ -609,6 +647,16 @@ app.get('/', (_req, res) => {
   res.send('AssetFlow API (Turso) Active');
 });
 
+// General API rate limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+// Apply to all API routes
+app.use('/api', apiLimiter);
+
 app.get('/api/health/db', async (_req, res) => {
   try {
     const row = await queryOne('SELECT 1 as ok');
@@ -627,8 +675,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const department = String(req.body.department || 'Unassigned').trim();
     const password = String(req.body.password || '');
 
-    if (password.length < 6) {
-      return badRequest(res, 'Password must be at least 6 characters.');
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+    return badRequest(res, passwordValidation.errors.join('. '));
     }
 
     const duplicate = await queryOne(
@@ -795,6 +844,42 @@ app.post('/api/auth/resend-verification', authLimiter, async (req, res) => {
   }
 });
 
+
+
+// Login attempt tracking
+const loginAttempts = new Map();
+const maxLoginAttempts = 5;
+const lockoutTime = 15 * 60 * 1000; // 15 minutes
+
+const checkLoginAttempts = (employeeNumber) => {
+  const attempts = loginAttempts.get(employeeNumber);
+  if (!attempts) return { allowed: true };
+  
+  if (attempts.count >= maxLoginAttempts) {
+    if (Date.now() - attempts.lastAttempt < lockoutTime) {
+      return { 
+        allowed: false, 
+        lockoutRemaining: Math.ceil((lockoutTime - (Date.now() - attempts.lastAttempt)) / 60000) 
+      };
+    }
+    loginAttempts.delete(employeeNumber);
+  }
+  return { allowed: true };
+};
+
+const recordLoginAttempt = (employeeNumber, success) => {
+  if (success) {
+    loginAttempts.delete(employeeNumber);
+    return;
+  }
+  
+  const attempts = loginAttempts.get(employeeNumber) || { count: 0, lastAttempt: Date.now() };
+  attempts.count += 1;
+  attempts.lastAttempt = Date.now();
+  loginAttempts.set(employeeNumber, attempts);
+};
+
+// Login route
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
     const employeeNumber = normalizeEmployeeNumber(requireNonEmptyString(req.body.employeeNumber, 'Employee Number'));
@@ -804,8 +889,10 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       'SELECT * FROM Employee WHERE upper(employeeNumber) = ? AND COALESCE(isArchived, 0) = 0',
       [employeeNumber],
     );
-    if (!employee) return res.status(401).json({ error: 'Invalid credentials.' });
-
+if (!employee) {
+  recordLoginAttempt(employeeNumber, false);
+  return res.status(401).json({ error: 'Invalid credentials.' });
+}
     if (isEmailVerificationRequired() && Number(employee.emailVerified || 0) !== 1) {
       return res.status(403).json({
         error: 'Please verify your email before signing in.',
@@ -826,13 +913,19 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       }
     }
 
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials.' });
+if (!valid) {
+  recordLoginAttempt(employeeNumber, false);
+  return res.status(401).json({ error: 'Invalid credentials.' });
+}
 
-    const fresh = await queryOne('SELECT * FROM Employee WHERE id = ?', [employee.id]);
-    const safeUser = sanitizeEmployee(fresh);
-    const token = signAuthToken(safeUser);
+// Record successful login BEFORE returning
+recordLoginAttempt(employeeNumber, true);
 
-    return res.json({ success: true, token, user: safeUser });
+const fresh = await queryOne('SELECT * FROM Employee WHERE id = ?', [employee.id]);
+const safeUser = sanitizeEmployee(fresh);
+const token = signAuthToken(safeUser);
+
+return res.json({ success: true, token, user: safeUser });
   } catch (e) {
     return badRequest(res, e.message);
   }
@@ -905,8 +998,10 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
     const password = String(req.body.password || '');
 
     if (!token) return badRequest(res, 'Reset token is required.');
-    if (password.length < 6)
-      return badRequest(res, 'Password must be at least 6 characters.');
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+    return badRequest(res, passwordValidation.errors.join('. '));
+    }
 
     const hashedToken = hashToken(token);
 
@@ -3250,6 +3345,176 @@ app.get('/api/notifications/admin/asset-confirmations', requireAdmin, async (_re
 });
 
 // =============================
+// SUPPLIERS (ADMIN)
+// =============================
+
+app.get('/api/suppliers', requireAdmin, async (_req, res) => {
+  try {
+    const scope = parseScope(_req.query.scope);
+    const rows = await queryAll(
+      `
+      SELECT * FROM Supplier
+      WHERE ${archivedPredicate(scope, 'Supplier.isArchived')}
+      ORDER BY datetime(createdAt) DESC, name ASC
+      `,
+    );
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/suppliers', requireAdmin, async (req, res) => {
+  try {
+    const name = requireNonEmptyString(req.body.name, 'Supplier name');
+    const contactPerson = String(req.body.contactPerson || '').trim();
+    const email = String(req.body.email || '').trim();
+    const phone = String(req.body.phone || '').trim();
+    const address = String(req.body.address || '').trim();
+    const website = String(req.body.website || '').trim();
+    const category = String(req.body.category || '').trim();
+    const notes = String(req.body.notes || '').trim();
+
+    const id = uid();
+
+    await run(
+      `
+      INSERT INTO Supplier (
+        id, name, contactPerson, email, phone, address, website, category, notes,
+        createdAt, isArchived
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      `,
+      [
+        id,
+        name,
+        contactPerson,
+        email,
+        phone,
+        address,
+        website,
+        category,
+        notes,
+        today(),
+      ],
+    );
+
+    await writeAuditLog({
+      type: 'ADDED',
+      entity: name,
+      message: `Supplier ${name} added to registry`,
+      user: getActorMeta(req).actorName,
+    });
+
+    res.status(201).json({ id });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+app.put('/api/suppliers/:id', requireAdmin, async (req, res) => {
+  try {
+    await getRequiredRow('Supplier', req.params.id, 'Supplier');
+
+    const name = requireNonEmptyString(req.body.name, 'Supplier name');
+    const contactPerson = String(req.body.contactPerson || '').trim();
+    const email = String(req.body.email || '').trim();
+    const phone = String(req.body.phone || '').trim();
+    const address = String(req.body.address || '').trim();
+    const website = String(req.body.website || '').trim();
+    const category = String(req.body.category || '').trim();
+    const notes = String(req.body.notes || '').trim();
+
+    await run(
+      `
+      UPDATE Supplier
+      SET name = ?, contactPerson = ?, email = ?, phone = ?, address = ?,
+          website = ?, category = ?, notes = ?
+      WHERE id = ?
+      `,
+      [
+        name,
+        contactPerson,
+        email,
+        phone,
+        address,
+        website,
+        category,
+        notes,
+        String(req.params.id),
+      ],
+    );
+
+    await writeAuditLog({
+      type: 'UPDATED',
+      entity: name,
+      message: `Supplier ${name} information updated`,
+      user: getActorMeta(req).actorName,
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+app.patch('/api/suppliers/:id/archive', requireAdmin, async (req, res) => {
+  try {
+    const item = await archiveRecord(
+      {
+        table: 'Supplier',
+        id: req.params.id,
+        entity: (row) => row.name || 'Supplier',
+        message: (row) => `${row.name} supplier record archived`,
+        label: 'Supplier',
+      },
+      req,
+    );
+    res.json({ success: true, item });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+app.patch('/api/suppliers/:id/restore', requireAdmin, async (req, res) => {
+  try {
+    const item = await restoreRecord(
+      {
+        table: 'Supplier',
+        id: req.params.id,
+        entity: (row) => row.name || 'Supplier',
+        message: (row) => `${row.name} supplier record restored`,
+        label: 'Supplier',
+      },
+      req,
+    );
+    res.json({ success: true, item });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+app.delete('/api/suppliers/:id', requireAdmin, async (req, res) => {
+  try {
+    const existing = await queryOne('SELECT name FROM Supplier WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Supplier not found' });
+
+    await run('DELETE FROM Supplier WHERE id = ?', [String(req.params.id)]);
+
+    await writeAuditLog({
+      type: 'DELETED',
+      entity: existing.name || 'Supplier',
+      message: 'Supplier record deleted',
+      user: getActorMeta(req).actorName,
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+// =============================
 // REPORTS (ADMIN)
 // =============================
 
@@ -4442,6 +4707,14 @@ const start = async () => {
     console.log(`AssetFlow Turso API -> http://localhost:${PORT}`);
   });
 };
+
+// Production error handler
+if (process.env.NODE_ENV === 'production') {
+  app.use((err, req, res, next) => {
+    console.error('Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  });
+}
 
 start().catch((err) => {
   console.error('Failed to start server:', err.message);
