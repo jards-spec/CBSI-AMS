@@ -182,7 +182,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             : 1;
 
   const usesAssetAssignment = resourceType === 'component' || resourceType === 'accessory';
-  const requiresEmployee = resourceType === 'asset' && mode === 'checkout';
+  const requiresEmployee =
+  (resourceType === 'asset' || resourceType === 'license') && mode === 'checkout';
   const requiresAssetSelection = usesAssetAssignment && mode === 'checkout';
   const requiresAssignmentSelection = usesAssetAssignment && mode === 'checkin' && assetAssignments.length > 1;
 
@@ -308,7 +309,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           {requiresEmployee ? (
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                Assigned Employee
+                {resourceType === 'license' ? 'Licensed User' : 'Assigned Employee'}
               </label>
 
               <div className="relative">

@@ -19,6 +19,8 @@ import {
   User as UserIcon,
   Sun,
   Moon,
+  BarChart3,
+  Building2,
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { AuditProvider } from './context/AuditContext';
@@ -27,6 +29,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import Login from './pages/Login';
 import NotificationBell from './components/NotificationBell';
+import SessionTimeoutWarning from './components/SessionTimeoutWarning';
 
 // ✅ add these imports
 import ForgotPassword from './pages/ForgotPassword';
@@ -44,6 +47,9 @@ import Maintenance from './pages/Maintenance';
 import AuditLog from './pages/AuditLog';
 import Requests from './pages/Requests';
 import Profile from './pages/Profile';
+import Reports from './pages/Reports';
+import Suppliers from './pages/Suppliers';
+
 
 function AppContent() {
   const {
@@ -113,6 +119,8 @@ function AppContent() {
     { id: 'maintenance', label: 'Maintenance', icon: Wrench, path: '/maintenance', show: true },
     { id: 'requests', label: 'Requests', icon: Send, path: '/requests', show: true },
     { id: 'audit', label: 'Audit Logs', icon: History, path: '/audit-history', show: canAccessAuditLog() },
+    { id: 'reports', label: 'Reports', icon: BarChart3, path: '/reports', show: canAccessAuditLog() },
+    { id: 'suppliers', label: 'Suppliers', icon: Building2, path: '/suppliers', show: canAccessAssets() },
   ].filter((item) => item.show);
 
   return (
@@ -281,7 +289,7 @@ function AppContent() {
           className="scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-800 flex-1 overflow-y-auto p-8"
           style={{ backgroundColor: 'var(--app-panel-muted)' }}
         >
-          <div className="mx-auto max-w-[1600px]">
+          <div className="mx-auto max-w-400">
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
@@ -295,6 +303,8 @@ function AppContent() {
               <Route path="/maintenance" element={<Maintenance />} />
               <Route path="/requests" element={<Requests />} />
               {canAccessAuditLog() && <Route path="/audit-history" element={<AuditLog />} />}
+              {canAccessAuditLog() && <Route path="/reports" element={<Reports />} />}
+              {canAccessAssets() && <Route path="/suppliers" element={<Suppliers />} />}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>
@@ -325,12 +335,13 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <NotificationProvider>
-            <AuditProvider>
-              <AppContent />
-            </AuditProvider>
-          </NotificationProvider>
-        </AuthProvider>
+  <NotificationProvider>
+    <AuditProvider>
+      <AppContent />
+      <SessionTimeoutWarning warningTime={5 * 60 * 1000} />
+    </AuditProvider>
+  </NotificationProvider>
+</AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
   );

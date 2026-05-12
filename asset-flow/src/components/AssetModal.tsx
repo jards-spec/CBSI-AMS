@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Hash, Building, DollarSign, Package } from 'lucide-react';
+import { X, Plus, Hash, Building, Package, Calendar } from 'lucide-react';
 
 interface Props {
   asset?: any;
@@ -24,22 +24,24 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
     notes: ''
   });
 
-  useEffect(() => {
-    if (asset) {
-      setFormData({
-        name: asset.name || '',
-        category: asset.category || 'Laptop',
-        modelNo: asset.modelNo || '',
-        serialNo: asset.serialNo || '',
-        status: asset.status || 'Available',
-        location: asset.location || '',
-        manufacturer: asset.manufacturer || '',
-        purchaseDate: asset.purchaseDate || '',
-        unitCost: asset.unitCost || '',
-        notes: asset.notes || ''
-      });
-    }
-  }, [asset]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ useEffect(() => {
+  if (!asset) return;
+  
+  setFormData({
+    name: asset.name || '',
+    category: asset.category || 'Laptop',
+    modelNo: asset.modelNo || '',
+    serialNo: asset.serialNo || '',
+    status: asset.status || 'Available',
+    location: asset.location || '',
+    manufacturer: asset.manufacturer || '',
+    purchaseDate: asset.purchaseDate || '',
+    unitCost: asset.unitCost || '',
+    notes: asset.notes || ''
+  });
+}, [asset]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +67,7 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
           </button>
         </div>
 
-        {/* YOUR ORIGINAL INPUT FIELDS - UNCHANGED */}
+        {/* FORM */}
         <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Device Name</label>
@@ -164,15 +166,26 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Unit Cost (PHP)</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Unit Cost (₱)</label>
+              <input 
+                type="number"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-[10px] font-black outline-none focus:border-emerald-500"
+                placeholder="0.00"
+                value={formData.unitCost}
+                onChange={e => setFormData({...formData, unitCost: e.target.value})}
+              />
+            </div>
+
+            {/* NEW: Purchase Date Field */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Purchase Date</label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600" size={14} />
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
                 <input 
-                  type="number"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3 pl-10 pr-3 text-white text-[10px] font-black outline-none focus:border-emerald-500"
-                  placeholder="0.00"
-                  value={formData.unitCost}
-                  onChange={e => setFormData({...formData, unitCost: e.target.value})}
+                  type="date"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3 pl-10 pr-3 text-white text-[10px] font-black outline-none focus:border-red-500"
+                  value={formData.purchaseDate}
+                  onChange={e => setFormData({...formData, purchaseDate: e.target.value})}
                 />
               </div>
             </div>
@@ -188,7 +201,7 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
             />
           </div>
 
-          {/* FOOTER ACTIONS - Moved inside form for clickability */}
+          {/* FOOTER ACTIONS */}
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
             <button 
               type="button" 

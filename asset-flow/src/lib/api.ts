@@ -3,10 +3,19 @@
  * Centralized API helper.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+/**
+ * src/lib/api.ts
+ * Centralized API helper.
+ */
+
+// ... rest of file
+
 const BASE =
   import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:5000/api';
+  '/api';
 
 const TOKEN_KEY = 'vantage_token';
 const USER_KEY = 'vantage_user';
@@ -148,6 +157,8 @@ export const api = {
 
   employees: createArchivableResource('employees'),
 
+  suppliers: createArchivableResource('suppliers'),
+
   consumables: {
     ...createArchivableResource('consumables'),
     checkout: (id: string | number) =>
@@ -161,14 +172,18 @@ export const api = {
     assignments: (id: string | number, status: AssignmentScope = 'active') =>
       request<any[]>(withAssignmentScope(`/accessories/${id}/assignments`, status)),
   },
-licenses: {
-  ...createArchivableResource('licenses'),
-  revealKey: (id: string | number, password: string) =>
-    request<{ success: boolean; key: string }>(`/licenses/${id}/reveal-key`, {
-      method: 'POST',
-      body: JSON.stringify({ password }),
-    }),
-},
+
+  licenses: {
+    ...createArchivableResource('licenses'),
+    revealKey: (id: string | number, password: string) =>
+      request<{ success: boolean; key: string }>(`/licenses/${id}/reveal-key`, {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      }),
+    assignees: (id: string | number, status: 'active' | 'removed' | 'all' = 'active') =>
+      request<any[]>(`/licenses/${id}/assignees${status === 'active' ? '' : `?status=${status}`}`),
+  },
+
   maintenance: createArchivableResource('maintenance'),
 
   requests: {
@@ -207,18 +222,20 @@ licenses: {
       request<any>('/transactions/checkin', { method: 'POST', body: JSON.stringify(data) }),
   },
 
-notifications: {
-  me: (unreadOnly = false) =>
-    request<any[]>(`/notifications/me${unreadOnly ? '?unreadOnly=true' : ''}`),
-  markRead: (id: string | number) =>
-    request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
-  markAllRead: () =>
-    request<{ success: boolean }>('/notifications/read-all', { method: 'PATCH' }),
-  confirm: (id: string | number) =>
-    request<{ success: boolean }>(`/notifications/${id}/confirm`, { method: 'PATCH' }),
-  decline: (id: string | number) =>
-    request<{ success: boolean }>(`/notifications/${id}/decline`, { method: 'PATCH' }),
-},
+  notifications: {
+    me: (unreadOnly = false) =>
+      request<any[]>(`/notifications/me${unreadOnly ? '?unreadOnly=true' : ''}`),
+    markRead: (id: string | number) =>
+      request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
+    markAllRead: () =>
+      request<{ success: boolean }>('/notifications/read-all', { method: 'PATCH' }),
+    confirm: (id: string | number) =>
+      request<{ success: boolean }>(`/notifications/${id}/confirm`, { method: 'PATCH' }),
+    decline: (id: string | number) =>
+      request<{ success: boolean }>(`/notifications/${id}/decline`, { method: 'PATCH' }),
+    adminAssetConfirmations: () =>
+      request<any[]>('/notifications/admin/asset-confirmations'),
+  },
 
   profile: {
     me: (_actor?: ActorContext) =>
@@ -234,5 +251,20 @@ notifications: {
       request<any[]>(withScope('/profile/me/requests', scope)),
     myMaintenance: (scope: ArchiveScope = 'active', _actor?: ActorContext) =>
       request<any[]>(withScope('/profile/me/maintenance', scope)),
+  },
+
+  reports: {
+    licenseCompliance: () =>
+      request<{ report: any[]; summary: any }>('/reports/license-compliance'),
+    assetValuation: () =>
+      request<{ report: any[]; summary: any }>('/reports/asset-valuation'),
+    departmentAllocation: () =>
+      request<{ report: any[]; summary: any }>('/reports/department-allocation'),
+    maintenanceCost: () =>
+      request<{ report: any[]; assetsReport: any[]; summary: any }>('/reports/maintenance-cost'),
+    employeeAssetHistory: () =>
+      request<{ report: any[]; summary: any }>('/reports/employee-asset-history'),
+    unconfirmedAssignments: () =>
+      request<{ report: any[]; pending: any[]; confirmed: any[]; declined: any[]; summary: any }>('/reports/unconfirmed-assignments'),
   },
 };

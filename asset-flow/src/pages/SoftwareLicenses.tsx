@@ -9,6 +9,11 @@ import {
   Copy,
   Archive,
   RotateCcw,
+  Users,
+  X,
+  Calendar,
+  BadgeCheck,
+  BadgeX,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import LicenseModal from '../components/LicenseModal';
@@ -17,6 +22,24 @@ import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 type Scope = 'active' | 'archived' | 'all';
+
+type Assignee = {
+  id: string;
+  licenseId: string;
+  employeeId: string;
+  employeeName: string;
+  employeeNumber: string;
+  department: string;
+  quantity: number;
+  assignedAt: string;
+  assignedById: string;
+  assignedByName: string;
+  status: 'ACTIVE' | 'REMOVED';
+  returnedAt: string | null;
+  returnedById: string | null;
+  returnedByName: string | null;
+  notes: string;
+};
 
 const SoftwareLicenses = () => {
   const { currentUser } = useAuth();
@@ -27,20 +50,32 @@ const SoftwareLicenses = () => {
   const [scope, setScope] = useState<Scope>('active');
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({});
-const [showKeyPrompt, setShowKeyPrompt] = useState(false);
-const [pendingLicense, setPendingLicense] = useState<any>(null);
-const [confirmPassword, setConfirmPassword] = useState('');
-const [confirmError, setConfirmError] = useState('');
-const [confirmLoading, setConfirmLoading] = useState(false);
+  const [showKeyPrompt, setShowKeyPrompt] = useState(false);
+  const [pendingLicense, setPendingLicense] = useState<any>(null);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmError, setConfirmError] = useState('');
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const [licenses, setLicenses] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [selectedLicense, setSelectedLicense] = useState<any>(null);
   const [transactionMode, setTransactionMode] = useState<'checkout' | 'checkin' | null>(null);
   const [transactionLoading, setTransactionLoading] = useState(false);
 
+  // Assignees state
+  const [showAssigneesModal, setShowAssigneesModal] = useState(false);
+  const [viewingLicense, setViewingLicense] = useState<any>(null);
+  const [assignees, setAssignees] = useState<Assignee[]>([]);
+  const [assigneesLoading, setAssigneesLoading] = useState(false);
+  const [assigneesScope, setAssigneesScope] = useState<'active' | 'removed' | 'all'>('active');
+
   const refresh = async (nextScope: Scope = scope) => {
     try {
-      const rows = await api.licenses.list(nextScope);
-      setLicenses(Array.isArray(rows) ? rows : []);
+      const [licenseRows, employeeRows] = await Promise.all([
+        api.licenses.list(nextScope),
+        api.employees.list('active'),
+      ]);
+      setLicenses(Array.isArray(licenseRows) ? licenseRows : []);
+      setEmployees(Array.isArray(employeeRows) ? employeeRows : []);
     } catch (error) {
       console.error('Failed to load licenses:', error);
     }
@@ -60,49 +95,76 @@ const [confirmLoading, setConfirmLoading] = useState(false);
   }, [licenses, searchQuery]);
 
   const canRevealSecurityKey = useMemo(() => {
-  const role = String(currentUser?.role || '').trim().toLowerCase();
-  return ['admin', 'superuser', 'super admin'].includes(role);
-}, [currentUser?.role]);
+    const role = String(currentUser?.role || '').trim().toLowerCase();
+    return ['admin', 'superuser', 'super admin'].includes(role);
+  }, [currentUser?.role]);
 
-const handleKeyClick = (license: any) => {
-  const isVisible = !!showKeys[license.id];
+  const loadAssignees = async (licenseId: string, status: 'active' | 'removed' | 'all' = 'active') => {
+    setAssigneesLoading(true);
+    try {
+      const rows = await api.licenses.assignees(licenseId, status);
+      setAssignees(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      console.error('Failed to load assignees:', error);
+      setAssignees([]);
+    } finally {
+      setAssigneesLoading(false);
+    }
+  };
 
-  if (isVisible) {
-    setShowKeys((current) => ({ ...current, [license.id]: false }));
-    return;
-  }
+  const handleViewAssignees = async (license: any) => {
+    setViewingLicense(license);
+    setAssigneesScope('active');
+    await loadAssignees(license.id, 'active');
+    setShowAssigneesModal(true);
+  };
 
-  if (!canRevealSecurityKey) {
-    alert('Only Admin/Superuser can reveal security keys.');
-    return;
-  }
+  const handleAssigneesScopeChange = async (newScope: 'active' | 'removed' | 'all') => {
+    setAssigneesScope(newScope);
+    if (viewingLicense) {
+      await loadAssignees(viewingLicense.id, newScope);
+    }
+  };
 
-  setPendingLicense(license);
-  setConfirmPassword('');
-  setConfirmError('');
-  setShowKeyPrompt(true);
-};
+  const handleKeyClick = (license: any) => {
+    const isVisible = !!showKeys[license.id];
 
-const handleConfirmReveal = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!pendingLicense) return;
+    if (isVisible) {
+      setShowKeys((current) => ({ ...current, [license.id]: false }));
+      return;
+    }
 
-  setConfirmLoading(true);
-  setConfirmError('');
+    if (!canRevealSecurityKey) {
+      alert('Only Admin/Superuser can reveal security keys.');
+      return;
+    }
 
-  try {
-    const response = await api.licenses.revealKey(pendingLicense.id, confirmPassword);
-    setRevealedKeys((prev) => ({ ...prev, [pendingLicense.id]: response.key }));
-    setShowKeys((prev) => ({ ...prev, [pendingLicense.id]: true }));
-    setShowKeyPrompt(false);
-    setPendingLicense(null);
+    setPendingLicense(license);
     setConfirmPassword('');
-  } catch (error: any) {
-    setConfirmError(error.message || 'Password verification failed.');
-  } finally {
-    setConfirmLoading(false);
-  }
-};
+    setConfirmError('');
+    setShowKeyPrompt(true);
+  };
+
+  const handleConfirmReveal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingLicense) return;
+
+    setConfirmLoading(true);
+    setConfirmError('');
+
+    try {
+      const response = await api.licenses.revealKey(pendingLicense.id, confirmPassword);
+      setRevealedKeys((prev) => ({ ...prev, [pendingLicense.id]: response.key }));
+      setShowKeys((prev) => ({ ...prev, [pendingLicense.id]: true }));
+      setShowKeyPrompt(false);
+      setPendingLicense(null);
+      setConfirmPassword('');
+    } catch (error: any) {
+      setConfirmError(error.message || 'Password verification failed.');
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
 
   const handleSave = async (formData: any) => {
     try {
@@ -173,6 +235,15 @@ const handleConfirmReveal = async (e: React.FormEvent) => {
     } finally {
       setTransactionLoading(false);
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   return (
@@ -269,9 +340,14 @@ const handleConfirmReveal = async (e: React.FormEvent) => {
               >
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-black uppercase italic tracking-tight text-slate-900 dark:text-white">
-                      {license.name}
-                    </h3>
+                    <button
+                      onClick={() => handleViewAssignees(license)}
+                      className="text-left hover:text-red-600 transition-colors"
+                    >
+                      <h3 className="text-lg font-black uppercase italic tracking-tight text-slate-900 dark:text-white hover:text-red-600">
+                        {license.name}
+                      </h3>
+                    </button>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-500">
                       {license.manufacturer || 'Unknown Manufacturer'}
                     </p>
@@ -339,6 +415,13 @@ const handleConfirmReveal = async (e: React.FormEvent) => {
                         className="rounded bg-emerald-600 px-4 py-1.5 text-[9px] font-black uppercase tracking-tighter text-white transition-all disabled:opacity-30 hover:bg-emerald-700"
                       >
                         Checkin
+                      </button>
+                      <button
+                        onClick={() => handleViewAssignees(license)}
+                        className="rounded bg-cyan-500/10 p-2 text-cyan-500 transition-all hover:bg-cyan-500 hover:text-white"
+                        title="View Assignees"
+                      >
+                        <Users size={12} />
                       </button>
                       <button
                         onClick={() => handleClone(license)}
@@ -410,7 +493,12 @@ const handleConfirmReveal = async (e: React.FormEvent) => {
                   >
                     <td className="px-5 py-5 font-bold uppercase tracking-tighter text-cyan-700 italic dark:text-cyan-400">
                       <div className="flex items-center gap-2">
-                        <span>{license.name}</span>
+                        <button
+                          onClick={() => handleViewAssignees(license)}
+                          className="hover:text-red-600 hover:underline transition-all text-left"
+                        >
+                          {license.name}
+                        </button>
                         {isArchived ? (
                           <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-500">
                             Archived
@@ -486,6 +574,13 @@ const handleConfirmReveal = async (e: React.FormEvent) => {
                         {!isArchived ? (
                           <>
                             <button
+                              onClick={() => handleViewAssignees(license)}
+                              className="rounded bg-cyan-500/10 p-1.5 text-cyan-500 transition-all hover:bg-cyan-500 hover:text-white"
+                              title="View Assignees"
+                            >
+                              <Users size={12} strokeWidth={3} />
+                            </button>
+                            <button
                               onClick={() => handleClone(license)}
                               className="rounded bg-cyan-500/10 p-1.5 text-cyan-500 transition-all hover:bg-cyan-500 hover:text-white"
                             >
@@ -552,6 +647,7 @@ const handleConfirmReveal = async (e: React.FormEvent) => {
         mode={transactionMode || 'checkout'}
         resourceType="license"
         item={selectedLicense}
+        employees={employees}
         loading={transactionLoading}
         onClose={() => {
           if (transactionLoading) return;
@@ -560,7 +656,8 @@ const handleConfirmReveal = async (e: React.FormEvent) => {
         }}
         onSubmit={handleTransactionSubmit}
       />
-            {showKeyPrompt && pendingLicense ? (
+
+      {showKeyPrompt && pendingLicense ? (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0f121d] p-6">
             <h3 className="text-sm font-black uppercase tracking-wider text-white">Confirm Password</h3>
@@ -603,6 +700,146 @@ const handleConfirmReveal = async (e: React.FormEvent) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Assignees Modal */}
+      {showAssigneesModal && viewingLicense ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-4xl rounded-2xl border border-slate-800 bg-[#0f121d] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 p-6">
+              <div>
+                <h2 className="text-lg font-black uppercase tracking-wider text-white">
+                  {viewingLicense.name}
+                </h2>
+                <p className="text-[11px] text-slate-400">License Assignments</p>
+              </div>
+              <button
+                onClick={() => setShowAssigneesModal(false)}
+                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-slate-800 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex rounded-xl border border-slate-800 bg-[#05070a] p-1">
+                  {(['active', 'removed', 'all'] as const).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => handleAssigneesScopeChange(status)}
+                      className={cn(
+                        'rounded-lg px-3 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all',
+                        assigneesScope === status
+                          ? 'bg-cyan-600 text-white'
+                          : 'text-slate-400 hover:text-white',
+                      )}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  {assignees.length} assignment{assignees.length !== 1 ? 's' : ''} found
+                </div>
+              </div>
+
+              {assigneesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-600 border-t-transparent" />
+                </div>
+              ) : assignees.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Users size={48} className="mb-4 text-slate-600" />
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                    No assignments found
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-600">
+                    {assigneesScope === 'active'
+                      ? 'No active assignments for this license'
+                      : assigneesScope === 'removed'
+                      ? 'No removed assignments for this license'
+                      : 'No assignments exist for this license'}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-slate-800">
+                  <table className="w-full border-collapse text-left">
+                    <thead>
+                      <tr className="bg-[#05070a] text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        <th className="px-4 py-3">Employee</th>
+                        <th className="px-4 py-3">Employee #</th>
+                        <th className="px-4 py-3">Department</th>
+                        <th className="px-4 py-3 text-center">Qty</th>
+                        <th className="px-4 py-3">Assigned</th>
+                        <th className="px-4 py-3">Assigned By</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3">Returned</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {assignees.map((assignee) => (
+                        <tr key={assignee.id} className="text-[11px] hover:bg-[#05070a]">
+                          <td className="px-4 py-4 font-bold text-white">
+                            {assignee.employeeName || 'Unknown'}
+                          </td>
+                          <td className="px-4 py-4 font-mono text-[10px] text-slate-400">
+                            {assignee.employeeNumber || 'N/A'}
+                          </td>
+                          <td className="px-4 py-4 text-slate-400">
+                            {assignee.department || 'N/A'}
+                          </td>
+                          <td className="px-4 py-4 text-center font-bold text-cyan-400">
+                            {assignee.quantity}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-1.5 text-slate-400">
+                              <Calendar size={10} />
+                              <span className="font-mono text-[10px]">{formatDate(assignee.assignedAt)}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-slate-400">
+                            {assignee.assignedByName || 'System'}
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            {assignee.status === 'ACTIVE' ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-emerald-500">
+                                <BadgeCheck size={8} /> Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-red-500">
+                                <BadgeX size={8} /> Removed
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            {assignee.returnedAt ? (
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <Calendar size={10} />
+                                <span className="font-mono text-[10px]">{formatDate(assignee.returnedAt)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-600">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-800 p-4">
+              <button
+                onClick={() => setShowAssigneesModal(false)}
+                className="rounded-xl border border-slate-700 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

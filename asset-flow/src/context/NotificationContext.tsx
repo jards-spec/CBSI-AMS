@@ -77,7 +77,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: 1 } : n)),
       );
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      alert((error as Error).message || 'Failed to mark notification as read');
     }
   };
 
@@ -86,7 +86,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       await api.notifications.markAllRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: 1 })));
     } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+      alert((error as Error).message || 'Failed to mark all notifications as read');
     }
   };
 
@@ -105,6 +105,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             : n,
         ),
       );
+      await refresh();
     } catch (error) {
       alert((error as Error).message || 'Failed to confirm notification');
     }
@@ -115,9 +116,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       await api.notifications.decline(notificationId);
       setNotifications((prev) =>
         prev.map((n) =>
-          n.id === notificationId ? { ...n, isRead: 1, status: 'DECLINED' } : n,
+          n.id === notificationId
+            ? {
+                ...n,
+                isRead: 1,
+                status: 'DECLINED',
+              }
+            : n,
         ),
       );
+      await refresh();
     } catch (error) {
       alert((error as Error).message || 'Failed to decline notification');
     }

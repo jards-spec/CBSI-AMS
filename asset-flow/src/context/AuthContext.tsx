@@ -26,6 +26,8 @@ interface AuthContextType {
   login: (user: User, token?: string) => void;
   logout: () => void;
   updateCurrentUser: (updates: Partial<User>) => void;
+  updateActivityTime: () => void;
+  getTimeRemaining: () => number;
 
   canCreate: () => boolean;
   canEdit: (employeeId?: string) => boolean;
@@ -44,7 +46,12 @@ interface AuthContextType {
 
 const TOKEN_KEY = 'vantage_token';
 const USER_KEY = 'vantage_user';
+const SESSION_START_KEY = 'session_start_time';
+const LAST_ACTIVITY_KEY = 'last_activity_time';
 const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized';
+
+// Session timeout configuration (8 hours in milliseconds)
+const SESSION_TIMEOUT = 8 * 60 * 60 * 1000; // 8 hours
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -72,6 +79,43 @@ const isAdminRole = (role: string = '') => {
   return r === 'admin';
 };
 
+// Session management functions
+const getSessionStartTime = (): string | null => {
+  return localStorage.getItem(SESSION_START_KEY);
+};
+
+const setSessionStartTime = (): void => {
+  localStorage.setItem(SESSION_START_KEY, Date.now().toString());
+};
+
+const getLastActivityTime = (): string | null => {
+  return localStorage.getItem(LAST_ACTIVITY_KEY);
+};
+
+const setLastActivityTime = (): void => {
+  localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+};
+
+const checkSessionTimeout = (): boolean => {
+  const lastActivity = getLastActivityTime();
+  if (!lastActivity) return false;
+  
+  const elapsed = Date.now() - parseInt(lastActivity);
+  return elapsed > SESSION_TIMEOUT;
+};
+
+const getTimeRemaining = (): number => {
+  const lastActivity = getLastActivityTime();
+  if (!lastActivity) return SESSION_TIMEOUT;
+  
+  const elapsed = Date.now() - parseInt(lastActivity);
+  return Math.max(0, SESSION_TIMEOUT - elapsed);
+};
+
+const updateActivityTime = (): void => {
+  setLastActivityTime();
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -79,6 +123,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(SESSION_START_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
   };
 
   useEffect(() => {
@@ -92,7 +138,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const parsed = JSON.parse(storedUser);
+      
+      // Check if session has expired
+      if (checkSessionTimeout()) {
+        clearAuthState();
+        window.location.assign('/login');
+        return;
+      }
+      
       setCurrentUser(normalizeUser(parsed));
+      
+      // Initialize activity time if not set
+      if (!getLastActivityTime()) {
+        setSessionStartTime();
+        setLastActivityTime();
+      }
     } catch {
       clearAuthState();
     }
@@ -128,6 +188,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // Track user activity and check session timeout
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Initialize session on first load
+    if (!getLastActivityTime()) {
+      setSessionStartTime();
+      setLastActivityTime();
+    }
+
+    const activities = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click', 'mousemove'];
+    
+    const handleActivity = () => {
+      updateActivityTime();
+    };
+
+    activities.forEach(event => {
+      window.addEventListener(event, handleActivity);
+    });
+
+    // Check timeout every minute
+    const interval = setInterval(() => {
+      if (checkSessionTimeout()) {
+        clearAuthState();
+        window.location.assign('/login');
+      }
+    }, 60000);
+
+    return () => {
+      activities.forEach(event => {
+        window.removeEventListener(event, handleActivity);
+      });
+      clearInterval(interval);
+    };
+  }, [currentUser]);
+
   const login = (user: User, token?: string) => {
     const normalizedUser = normalizeUser(user);
     setCurrentUser(normalizedUser);
@@ -135,6 +231,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (token) {
       localStorage.setItem(TOKEN_KEY, token);
     }
+    
+    // Initialize session timeout on login
+    setSessionStartTime();
+    setLastActivityTime();
   };
 
   const logout = () => {
@@ -183,7 +283,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
-  // ✅ Inventory restricted to privileged roles
   const canAccessAssets = (): boolean => {
     if (!currentUser) return false;
     return isPrivilegedRole(currentUser.role);
@@ -226,6 +325,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         updateCurrentUser,
+        updateActivityTime,
+        getTimeRemaining,
         canCreate,
         canEdit,
         canDelete,

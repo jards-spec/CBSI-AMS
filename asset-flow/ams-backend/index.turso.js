@@ -1,9 +1,10 @@
 require('dotenv').config();
-const { encryptString, decryptString } = require('./crypto-utils');
+const { encryptString, decryptString } = require('../crypto-utils');
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@libsql/client');
-const { randomUUID, randomBytes, createHash } = require('crypto');const bcrypt = require('bcryptjs');
+const { randomUUID, randomBytes, createHash } = require('crypto');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const {
@@ -11,12 +12,27 @@ const {
   sendEmailVerificationEmail,
   sendPasswordResetEmail,
   isMailerConfigured,
-} = require('./mailer');
+} = require('../mailer');
 
 const app = express();
 
+// CORS - Allow all origins for development
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+const helmet = require('helmet');
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
 
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -143,11 +159,33 @@ const sanitizeEmployee = (row) => {
     ...safe
   } = row;
 
-  // Optionally include decrypted values in safe output for admins:
   return {
     ...safe,
     phone: phoneEnc ? decryptString(phoneEnc) : (row.phone || ''),
     jobTitle: jobTitleEnc ? decryptString(jobTitleEnc) : (row.jobTitle || ''),
+  };
+};
+
+// Password strength validation
+const validatePasswordStrength = (password) => {
+  const errors = [];
+  
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters');
+  }
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  }
+  if (!/[0-9]/.test(password)) {
+    errors.push('Password must contain at least one number');
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
   };
 };
 
@@ -219,8 +257,8 @@ const signAuthToken = (user) => {
     { expiresIn: '7d' },
   );
 };
-  
-  const writeAuditLog = async ({ type, entity, message, user = 'SYSTEM' }) => {
+
+const writeAuditLog = async ({ type, entity, message, user = 'SYSTEM' }) => {
   await run(
     `
     INSERT INTO AuditLog (id, timestamp, type, entity, message, user, createdAt)
@@ -256,7 +294,6 @@ const writeNotification = async ({
   );
 };
 
-
 const getRequiredRow = async (table, id, label = 'Record') => {
   const row = await queryOne(`SELECT * FROM ${table} WHERE id = ?`, [String(id)]);
   if (!row) throw new Error(`${label} not found`);
@@ -286,17 +323,12 @@ const createEmailVerificationExpiry = () => {
 };
 
 const buildEmailVerificationUrl = (token) => {
-  
   const base =
     process.env.API_PUBLIC_BASE_URL ||
     process.env.BACKEND_PUBLIC_URL ||
     'http://localhost:5000';
   return `${String(base).replace(/\/+$/, '')}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
 };
-
-// =============================
-// EMAIL VERIFICATION + PASSWORD RESET COLUMN ENSURERS
-// =============================
 
 const passwordResetTtlMinutes = () =>
   Number(process.env.PASSWORD_RESET_TTL_MINUTES || 60);
@@ -332,6 +364,7 @@ const ensurePasswordResetColumns = async () => {
     await run('ALTER TABLE Employee ADD COLUMN passwordResetExpiresAt TEXT');
   }
 };
+
 const ensureNotificationTable = async () => {
   await run(`
     CREATE TABLE IF NOT EXISTS Notification (
@@ -364,6 +397,28 @@ const ensureNotificationTable = async () => {
 
   await run('CREATE INDEX IF NOT EXISTS idx_notification_employee_created ON Notification(employeeId, createdAt DESC)');
   await run('CREATE INDEX IF NOT EXISTS idx_notification_employee_read ON Notification(employeeId, isRead)');
+};
+
+const ensureLicenseAssignmentTable = async () => {
+  await run(`
+    CREATE TABLE IF NOT EXISTS LicenseAssignment (
+      id TEXT PRIMARY KEY,
+      licenseId TEXT NOT NULL,
+      employeeId TEXT NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      assignedAt TEXT NOT NULL,
+      assignedById TEXT,
+      assignedByName TEXT,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      returnedAt TEXT,
+      returnedById TEXT,
+      returnedByName TEXT,
+      notes TEXT
+    )
+  `);
+
+  await run('CREATE INDEX IF NOT EXISTS idx_license_assignment_license_status ON LicenseAssignment(licenseId, status)');
+  await run('CREATE INDEX IF NOT EXISTS idx_license_assignment_employee_status ON LicenseAssignment(employeeId, status)');
 };
 
 const ensureEmployeeVerificationColumns = async () => {
@@ -418,7 +473,8 @@ const notifyAssetAssignment = async ({
       [String(employeeId)],
     );
 
-if (!employee) return;
+    if (!employee) return;
+
     const asset = await queryOne(
       `
       SELECT id, tag, name, location
@@ -430,32 +486,33 @@ if (!employee) return;
 
     if (!asset) return;
 
-  if (employee.email && isMailerConfigured()) {
-  await sendAssetAssignmentEmail({
-    to: String(employee.email),
-    employeeName: employee.name || '',
-    assetTag: asset.tag || '',
-    assetName: asset.name || '',
-    assignedByName: req.user?.name || req.user?.email || req.user?.role || 'System',
-    checkoutDate: checkoutDate || today(),
-    expectedCheckinDate: expectedCheckinDate || '',
-    location: location || asset.location || '',
-  });
-}
+    if (employee.email && isMailerConfigured()) {
+      await sendAssetAssignmentEmail({
+        to: String(employee.email),
+        employeeName: employee.name || '',
+        assetTag: asset.tag || '',
+        assetName: asset.name || '',
+        assignedByName: req.user?.name || req.user?.email || req.user?.role || 'System',
+        checkoutDate: checkoutDate || today(),
+        expectedCheckinDate: expectedCheckinDate || '',
+        location: location || asset.location || '',
+      });
+    }
+
     await writeNotification({
-  employeeId: employee.id,
-  title: 'Asset Assigned',
-  message: `${asset.tag || asset.id} - ${asset.name || 'Asset'} has been assigned to you.`,
-  type: 'ASSET_ASSIGNMENT',
-  metadata: {
-    assetId: String(asset.id),
-    assetTag: asset.tag || '',
-    assetName: asset.name || '',
-    checkoutDate: checkoutDate || today(),
-    expectedCheckinDate: expectedCheckinDate || '',
-    location: location || asset.location || '',
-  },
-});
+      employeeId: employee.id,
+      title: 'Asset Assigned',
+      message: `${asset.tag || asset.id} - ${asset.name || 'Asset'} has been assigned to you.`,
+      type: 'ASSET_ASSIGNMENT',
+      metadata: {
+        assetId: String(asset.id),
+        assetTag: asset.tag || '',
+        assetName: asset.name || '',
+        checkoutDate: checkoutDate || today(),
+        expectedCheckinDate: expectedCheckinDate || '',
+        location: location || asset.location || '',
+      },
+    });
   } catch (err) {
     console.error('Asset assignment email failed:', err.message);
   }
@@ -590,6 +647,16 @@ app.get('/', (_req, res) => {
   res.send('AssetFlow API (Turso) Active');
 });
 
+// General API rate limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+// Apply to all API routes
+app.use('/api', apiLimiter);
+
 app.get('/api/health/db', async (_req, res) => {
   try {
     const row = await queryOne('SELECT 1 as ok');
@@ -608,8 +675,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const department = String(req.body.department || 'Unassigned').trim();
     const password = String(req.body.password || '');
 
-    if (password.length < 6) {
-      return badRequest(res, 'Password must be at least 6 characters.');
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+    return badRequest(res, passwordValidation.errors.join('. '));
     }
 
     const duplicate = await queryOne(
@@ -776,6 +844,42 @@ app.post('/api/auth/resend-verification', authLimiter, async (req, res) => {
   }
 });
 
+
+
+// Login attempt tracking
+const loginAttempts = new Map();
+const maxLoginAttempts = 5;
+const lockoutTime = 15 * 60 * 1000; // 15 minutes
+
+const checkLoginAttempts = (employeeNumber) => {
+  const attempts = loginAttempts.get(employeeNumber);
+  if (!attempts) return { allowed: true };
+  
+  if (attempts.count >= maxLoginAttempts) {
+    if (Date.now() - attempts.lastAttempt < lockoutTime) {
+      return { 
+        allowed: false, 
+        lockoutRemaining: Math.ceil((lockoutTime - (Date.now() - attempts.lastAttempt)) / 60000) 
+      };
+    }
+    loginAttempts.delete(employeeNumber);
+  }
+  return { allowed: true };
+};
+
+const recordLoginAttempt = (employeeNumber, success) => {
+  if (success) {
+    loginAttempts.delete(employeeNumber);
+    return;
+  }
+  
+  const attempts = loginAttempts.get(employeeNumber) || { count: 0, lastAttempt: Date.now() };
+  attempts.count += 1;
+  attempts.lastAttempt = Date.now();
+  loginAttempts.set(employeeNumber, attempts);
+};
+
+// Login route
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
     const employeeNumber = normalizeEmployeeNumber(requireNonEmptyString(req.body.employeeNumber, 'Employee Number'));
@@ -785,8 +889,10 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       'SELECT * FROM Employee WHERE upper(employeeNumber) = ? AND COALESCE(isArchived, 0) = 0',
       [employeeNumber],
     );
-    if (!employee) return res.status(401).json({ error: 'Invalid credentials.' });
-
+if (!employee) {
+  recordLoginAttempt(employeeNumber, false);
+  return res.status(401).json({ error: 'Invalid credentials.' });
+}
     if (isEmailVerificationRequired() && Number(employee.emailVerified || 0) !== 1) {
       return res.status(403).json({
         error: 'Please verify your email before signing in.',
@@ -807,21 +913,25 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       }
     }
 
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials.' });
+if (!valid) {
+  recordLoginAttempt(employeeNumber, false);
+  return res.status(401).json({ error: 'Invalid credentials.' });
+}
 
-    const fresh = await queryOne('SELECT * FROM Employee WHERE id = ?', [employee.id]);
-    const safeUser = sanitizeEmployee(fresh);
-    const token = signAuthToken(safeUser);
+// Record successful login BEFORE returning
+recordLoginAttempt(employeeNumber, true);
 
-    return res.json({ success: true, token, user: safeUser });
+const fresh = await queryOne('SELECT * FROM Employee WHERE id = ?', [employee.id]);
+const safeUser = sanitizeEmployee(fresh);
+const token = signAuthToken(safeUser);
+
+return res.json({ success: true, token, user: safeUser });
   } catch (e) {
     return badRequest(res, e.message);
   }
 });
-// =============================
-// FORGOT PASSWORD
-// =============================
 
+// FORGOT PASSWORD
 app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
   try {
     const email = requireNonEmptyString(req.body.email, 'Email').trim().toLowerCase();
@@ -881,19 +991,17 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
   }
 });
 
-
-// =============================
 // RESET PASSWORD
-// =============================
-
 app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
   try {
     const token = String(req.body.token || '').trim();
     const password = String(req.body.password || '');
 
     if (!token) return badRequest(res, 'Reset token is required.');
-    if (password.length < 6)
-      return badRequest(res, 'Password must be at least 6 characters.');
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+    return badRequest(res, passwordValidation.errors.join('. '));
+    }
 
     const hashedToken = hashToken(token);
 
@@ -945,14 +1053,14 @@ app.use('/api', (req, res, next) => {
     path === '/auth/forgot-password' ||
     path === '/auth/reset-password' ||
     path === '/health/db';
-    
 
   if (isPublic) return next();
   return requireAuth(req, res, next);
 });
 
 // ASSETS
-app.get('/api/assets', requireAdmin, async (req, res) => {  try {
+app.get('/api/assets', requireAdmin, async (req, res) => {
+  try {
     const scope = parseScope(req.query.scope);
     const rows = await queryAll(
       `
@@ -1292,34 +1400,15 @@ app.put('/api/employees/:id', requireAdmin, async (req, res) => {
       );
     } else {
       const phoneEnc = encryptString(req.body.phone || '');
-const jobTitleEnc = encryptString(req.body.jobTitle || '');
+      const jobTitleEnc = encryptString(req.body.jobTitle || '');
 
-await run(
-  `
-  UPDATE Employee
-  SET name = ?, email = ?, employeeNumber = ?, department = ?, role = ?,
-      avatar = ?,
-      phone = '', jobTitle = '',
-      phoneEnc = ?, jobTitleEnc = ?
-  WHERE id = ?
-  `,
-  [
-    name,
-    email,
-    employeeNumber,
-    req.body.department || '',
-    normalizeRole(req.body.role),
-    req.body.avatar || '',
-    phoneEnc,
-    jobTitleEnc,
-    String(req.params.id),
-  ],
-);
       await run(
         `
         UPDATE Employee
         SET name = ?, email = ?, employeeNumber = ?, department = ?, role = ?,
-            avatar = ?, phone = ?, jobTitle = ?
+            avatar = ?,
+            phone = '', jobTitle = '',
+            phoneEnc = ?, jobTitleEnc = ?
         WHERE id = ?
         `,
         [
@@ -1329,8 +1418,8 @@ await run(
           req.body.department || '',
           normalizeRole(req.body.role),
           req.body.avatar || '',
-          req.body.phone || '',
-          req.body.jobTitle || '',
+          phoneEnc,
+          jobTitleEnc,
           String(req.params.id),
         ],
       );
@@ -1788,9 +1877,9 @@ app.get('/api/licenses', async (req, res) => {
     const rows = await queryAll(
       `
       SELECT
-  id, name, manufacturer, licensedEmail, expirationDate,
-  minQty, total, avail, unitCost, createdAt,
-  isArchived, archivedAt, archivedById, archivedByName
+        id, name, manufacturer, licensedEmail, expirationDate,
+        minQty, total, avail, unitCost, createdAt,
+        isArchived, archivedAt, archivedById, archivedByName
       FROM License
       WHERE ${archivedPredicate(scope, 'License.isArchived')}
       ORDER BY datetime(createdAt) DESC
@@ -1799,6 +1888,38 @@ app.get('/api/licenses', async (req, res) => {
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/licenses/:id/assignees', requireAdmin, async (req, res) => {
+  try {
+    const statusRaw = String(req.query.status || 'active').toLowerCase();
+    const whereStatus =
+      statusRaw === 'all'
+        ? '1=1'
+        : statusRaw === 'removed'
+          ? "la.status = 'REMOVED'"
+          : "la.status = 'ACTIVE'";
+
+    const rows = await queryAll(
+      `
+      SELECT
+        la.*,
+        e.name AS employeeName,
+        e.employeeNumber,
+        e.department
+      FROM LicenseAssignment la
+      LEFT JOIN Employee e ON e.id = la.employeeId
+      WHERE la.licenseId = ?
+        AND ${whereStatus}
+      ORDER BY datetime(COALESCE(la.assignedAt, la.returnedAt)) DESC
+      `,
+      [String(req.params.id)],
+    );
+
+    res.json(rows);
+  } catch (e) {
+    badRequest(res, e.message);
   }
 });
 
@@ -1812,8 +1933,6 @@ app.post('/api/licenses/:id/reveal-key', requireAuth, async (req, res) => {
     }
 
     const password = requireNonEmptyString(req.body.password, 'Password');
-    console.log('[REVEAL] actor:', req.user?.sub, req.user?.employeeNumber, req.user?.role);
-console.log('[REVEAL] password length:', password.length);
 
     const employee = await queryOne(
       `
@@ -1827,7 +1946,6 @@ console.log('[REVEAL] password length:', password.length);
 
     const valid = await verifyStoredPassword(employee, password);
     if (!valid) return res.status(401).json({ error: 'Invalid password.' });
-    console.log('[REVEAL] stored prefix:', String(employee.password || '').slice(0, 4), 'valid:', valid);
 
     const license = await queryOne(
       `
@@ -1900,13 +2018,13 @@ app.post('/api/licenses', requireAdmin, async (req, res) => {
 
 app.put('/api/licenses/:id', requireAdmin, async (req, res) => {
   try {
-  const existingLicense = await getRequiredRow('License', req.params.id, 'License');
-  const keyToStore =
-    Object.prototype.hasOwnProperty.call(req.body, 'key')
-      ? String(req.body.key || '')
-      : String(existingLicense.key || '');
+    const existingLicense = await getRequiredRow('License', req.params.id, 'License');
+    const keyToStore =
+      Object.prototype.hasOwnProperty.call(req.body, 'key')
+        ? String(req.body.key || '')
+        : String(existingLicense.key || '');
 
-  const name = requireNonEmptyString(req.body.name, 'License name');
+    const name = requireNonEmptyString(req.body.name, 'License name');
     const total = requireNonNegativeNumber(req.body.total ?? 0, 'Total');
     const avail = requireNonNegativeNumber(req.body.avail ?? 0, 'Available');
     if (avail > total) return badRequest(res, 'Available cannot exceed total.');
@@ -2581,14 +2699,50 @@ app.post('/api/transactions/checkout', requireAdmin, async (req, res) => {
     if (resourceType === 'license') {
       const item = await getRequiredRow('License', itemId, 'License');
       ensureNotArchived(item, 'License');
+
+      const employeeId = requireNonEmptyString(req.body.employeeId, 'Employee ID');
       if (Number(item.avail || 0) < qty) return badRequest(res, 'Not enough licenses available');
 
       await run('UPDATE License SET avail = ? WHERE id = ?', [Number(item.avail || 0) - qty, itemId]);
 
+      await run(
+        `
+        INSERT INTO LicenseAssignment (
+          id, licenseId, employeeId, quantity, assignedAt, assignedById, assignedByName, status, notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+        `,
+        [
+          uid(),
+          String(itemId),
+          String(employeeId),
+          qty,
+          nowIso(),
+          String(req.user?.sub || ''),
+          getActorMeta(req).actorName,
+          String(req.body.notes || ''),
+        ],
+      );
+
+      await writeNotification({
+        employeeId: String(employeeId),
+        type: 'LICENSE_ASSIGNMENT',
+        title: 'Software License Assigned',
+        message: `${item.name || 'Software license'} has been assigned to you.`,
+        metadata: {
+          licenseId: String(item.id),
+          licenseName: item.name || '',
+          quantity: qty,
+          assignedById: String(req.user?.sub || ''),
+          assignedByName: getActorMeta(req).actorName,
+        },
+        status: 'PENDING',
+      });
+
       await writeAuditLog({
         type: 'CHECKOUT',
         entity: item.name || 'License',
-        message: `${qty} license seat(s) checked out`,
+        message: `${qty} license seat(s) checked out to employee ${employeeId}`,
         user: getActorMeta(req).actorName,
       });
 
@@ -2939,21 +3093,23 @@ app.put('/api/profile/me', async (req, res) => {
     setIfDefined('name', req.body.name);
     setIfDefined('email', req.body.email);
     setIfDefined('avatar', req.body.avatar);
-// phone (encrypt)
-if (req.body.phone !== undefined) {
-  updates.push('phone = ?');
-  args.push(''); // clear plaintext
-  updates.push('phoneEnc = ?');
-  args.push(encryptString(req.body.phone));
-}
 
-// jobTitle (encrypt)
-if (req.body.jobTitle !== undefined) {
-  updates.push('jobTitle = ?');
-  args.push('');
-  updates.push('jobTitleEnc = ?');
-  args.push(encryptString(req.body.jobTitle));
-}
+    // phone (encrypt)
+    if (req.body.phone !== undefined) {
+      updates.push('phone = ?');
+      args.push(''); // clear plaintext
+      updates.push('phoneEnc = ?');
+      args.push(encryptString(req.body.phone));
+    }
+
+    // jobTitle (encrypt)
+    if (req.body.jobTitle !== undefined) {
+      updates.push('jobTitle = ?');
+      args.push('');
+      updates.push('jobTitleEnc = ?');
+      args.push(encryptString(req.body.jobTitle));
+    }
+
     if (isPrivilegedRole(effectiveRole)) {
       if (req.body.employeeNumber !== undefined) {
         const normalizedEmployeeNumber = normalizeEmployeeNumber(req.body.employeeNumber);
@@ -2989,13 +3145,14 @@ if (req.body.jobTitle !== undefined) {
     badRequest(res, e.message);
   }
 });
+
 // NOTIFICATIONS (AUTHENTICATED USER)
 app.get('/api/notifications/me', async (req, res) => {
   try {
     const unreadOnly = String(req.query.unreadOnly || '').toLowerCase() === 'true';
     const rows = await queryAll(
       `
-      SELECT id, employeeId, type, title, message, metadata, isRead, createdAt
+      SELECT id, employeeId, type, title, message, metadata, isRead, createdAt, status, confirmedAt, confirmedById
       FROM Notification
       WHERE employeeId = ?
         AND (? = 0 OR COALESCE(isRead, 0) = 0)
@@ -3044,18 +3201,14 @@ app.patch('/api/notifications/read-all', async (req, res) => {
   }
 });
 
+// Single confirm/decline handlers (user confirms their own notification)
 app.patch('/api/notifications/:id/confirm', requireAuth, async (req, res) => {
   try {
     if (!req.user?.sub) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const existing = await queryOne(
-      'SELECT * FROM Notification WHERE id = ?',
-      [String(req.params.id)],
-    );
+    const existing = await queryOne('SELECT * FROM Notification WHERE id = ?', [String(req.params.id)]);
     if (!existing) return res.status(404).json({ error: 'Notification not found' });
-    if (String(existing.employeeId) !== String(req.user.sub)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
+    if (String(existing.employeeId) !== String(req.user.sub)) return res.status(403).json({ error: 'Forbidden' });
 
     await run(
       `
@@ -3070,21 +3223,39 @@ app.patch('/api/notifications/:id/confirm', requireAuth, async (req, res) => {
     );
 
     const metadata = safeJsonParse(existing.metadata, {});
-    const assetLabel =
-      metadata.assetTag && metadata.assetName
-        ? `${metadata.assetTag} (${metadata.assetName})`
-        : metadata.assetTag || metadata.assetName || 'Assigned Asset';
+    const itemLabel = metadata.assetTag
+      ? `${metadata.assetTag}${metadata.assetName ? ` (${metadata.assetName})` : ''}`
+      : metadata.licenseName || metadata.assetName || 'Assigned Item';
+
+    // Notify assigning admin (if metadata has assignedById)
+    const assignedById = String(metadata.assignedById || '').trim();
+    if (assignedById) {
+      await writeNotification({
+        employeeId: assignedById,
+        type: 'ASSIGNMENT_RESPONSE',
+        status: 'INFO',
+        title: 'Assignment Confirmed',
+        message: `${req.user.name || req.user.email || req.user.sub} confirmed receipt of ${itemLabel}.`,
+        metadata: {
+          sourceNotificationId: existing.id,
+          itemLabel,
+          responderId: req.user.sub,
+          responderName: req.user.name || req.user.email || '',
+          response: 'CONFIRMED',
+        },
+      });
+    }
 
     await writeAuditLog({
       type: 'CONFIRMED',
-      entity: assetLabel,
-      message: `Asset receipt confirmed by ${req.user.name || req.user.email || req.user.sub}`,
+      entity: itemLabel,
+      message: `${req.user.name || req.user.email || req.user.sub} confirmed assignment`,
       user: getActorMeta(req).actorName,
     });
 
-    return res.json({ success: true });
+    res.json({ success: true });
   } catch (e) {
-    return badRequest(res, e.message);
+    badRequest(res, e.message);
   }
 });
 
@@ -3092,33 +3263,59 @@ app.patch('/api/notifications/:id/decline', requireAuth, async (req, res) => {
   try {
     if (!req.user?.sub) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const existing = await queryOne(
-      'SELECT * FROM Notification WHERE id = ?',
-      [String(req.params.id)],
-    );
+    const existing = await queryOne('SELECT * FROM Notification WHERE id = ?', [String(req.params.id)]);
     if (!existing) return res.status(404).json({ error: 'Notification not found' });
-    if (String(existing.employeeId) !== String(req.user.sub)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
+    if (String(existing.employeeId) !== String(req.user.sub)) return res.status(403).json({ error: 'Forbidden' });
 
     await run(
       `
       UPDATE Notification
       SET status = 'DECLINED',
           isRead = 1,
-          confirmedAt = NULL,
-          confirmedById = NULL
+          confirmedAt = ?,
+          confirmedById = ?
       WHERE id = ?
       `,
-      [String(req.params.id)],
+      [nowIso(), String(req.user.sub), String(req.params.id)],
     );
 
-    return res.json({ success: true });
+    const metadata = safeJsonParse(existing.metadata, {});
+    const itemLabel = metadata.assetTag
+      ? `${metadata.assetTag}${metadata.assetName ? ` (${metadata.assetName})` : ''}`
+      : metadata.licenseName || metadata.assetName || 'Assigned Item';
+
+    const assignedById = String(metadata.assignedById || '').trim();
+    if (assignedById) {
+      await writeNotification({
+        employeeId: assignedById,
+        type: 'ASSIGNMENT_RESPONSE',
+        status: 'INFO',
+        title: 'Assignment Declined',
+        message: `${req.user.name || req.user.email || req.user.sub} declined assignment of ${itemLabel}.`,
+        metadata: {
+          sourceNotificationId: existing.id,
+          itemLabel,
+          responderId: req.user.sub,
+          responderName: req.user.name || req.user.email || '',
+          response: 'DECLINED',
+        },
+      });
+    }
+
+    await writeAuditLog({
+      type: 'DECLINED',
+      entity: itemLabel,
+      message: `${req.user.name || req.user.email || req.user.sub} declined assignment`,
+      user: getActorMeta(req).actorName,
+    });
+
+    res.json({ success: true });
   } catch (e) {
-    return badRequest(res, e.message);
+    badRequest(res, e.message);
   }
 });
 
+// Admin endpoint to view all asset confirmations
 app.get('/api/notifications/admin/asset-confirmations', requireAdmin, async (_req, res) => {
   try {
     const rows = await queryAll(
@@ -3147,78 +3344,1287 @@ app.get('/api/notifications/admin/asset-confirmations', requireAdmin, async (_re
   }
 });
 
-app.patch('/api/notifications/:id/confirm', requireAuth, async (req, res) => {
+// =============================
+// SUPPLIERS (ADMIN)
+// =============================
+
+app.get('/api/suppliers', requireAdmin, async (_req, res) => {
   try {
-    if (!req.user?.sub) return res.status(401).json({ error: 'Unauthorized.' });
-
-    const existing = await queryOne(
-      'SELECT * FROM Notification WHERE id = ?',
-      [String(req.params.id)],
-    );
-    if (!existing) return res.status(404).json({ error: 'Notification not found' });
-    if (String(existing.employeeId) !== String(req.user.sub)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    await run(
+    const scope = parseScope(_req.query.scope);
+    const rows = await queryAll(
       `
-      UPDATE Notification
-      SET status = 'CONFIRMED',
-          isRead = 1,
-          confirmedAt = ?,
-          confirmedById = ?
-      WHERE id = ?
+      SELECT * FROM Supplier
+      WHERE ${archivedPredicate(scope, 'Supplier.isArchived')}
+      ORDER BY datetime(createdAt) DESC, name ASC
       `,
-      [nowIso(), String(req.user.sub), String(req.params.id)],
     );
-
-    const metadata = safeJsonParse(existing.metadata, {});
-    const assetLabel =
-      metadata.assetTag && metadata.assetName
-        ? `${metadata.assetTag} (${metadata.assetName})`
-        : metadata.assetTag || metadata.assetName || 'Assigned Asset';
-
-    await writeAuditLog({
-      type: 'CONFIRMED',
-      entity: assetLabel,
-      message: `Asset receipt confirmed by ${req.user.name || req.user.email || req.user.sub}`,
-      user: getActorMeta(req).actorName,
-    });
-
-    return res.json({ success: true });
+    res.json(rows);
   } catch (e) {
-    return badRequest(res, e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
-app.patch('/api/notifications/:id/decline', requireAuth, async (req, res) => {
+app.post('/api/suppliers', requireAdmin, async (req, res) => {
   try {
-    if (!req.user?.sub) return res.status(401).json({ error: 'Unauthorized.' });
+    const name = requireNonEmptyString(req.body.name, 'Supplier name');
+    const contactPerson = String(req.body.contactPerson || '').trim();
+    const email = String(req.body.email || '').trim();
+    const phone = String(req.body.phone || '').trim();
+    const address = String(req.body.address || '').trim();
+    const website = String(req.body.website || '').trim();
+    const category = String(req.body.category || '').trim();
+    const notes = String(req.body.notes || '').trim();
 
-    const existing = await queryOne(
-      'SELECT * FROM Notification WHERE id = ?',
-      [String(req.params.id)],
-    );
-    if (!existing) return res.status(404).json({ error: 'Notification not found' });
-    if (String(existing.employeeId) !== String(req.user.sub)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
+    const id = uid();
 
     await run(
       `
-      UPDATE Notification
-      SET status = 'DECLINED',
-          isRead = 1,
-          confirmedAt = NULL,
-          confirmedById = NULL
-      WHERE id = ?
+      INSERT INTO Supplier (
+        id, name, contactPerson, email, phone, address, website, category, notes,
+        createdAt, isArchived
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
       `,
-      [String(req.params.id)],
+      [
+        id,
+        name,
+        contactPerson,
+        email,
+        phone,
+        address,
+        website,
+        category,
+        notes,
+        today(),
+      ],
     );
 
-    return res.json({ success: true });
+    await writeAuditLog({
+      type: 'ADDED',
+      entity: name,
+      message: `Supplier ${name} added to registry`,
+      user: getActorMeta(req).actorName,
+    });
+
+    res.status(201).json({ id });
   } catch (e) {
-    return badRequest(res, e.message);
+    badRequest(res, e.message);
+  }
+});
+
+app.put('/api/suppliers/:id', requireAdmin, async (req, res) => {
+  try {
+    await getRequiredRow('Supplier', req.params.id, 'Supplier');
+
+    const name = requireNonEmptyString(req.body.name, 'Supplier name');
+    const contactPerson = String(req.body.contactPerson || '').trim();
+    const email = String(req.body.email || '').trim();
+    const phone = String(req.body.phone || '').trim();
+    const address = String(req.body.address || '').trim();
+    const website = String(req.body.website || '').trim();
+    const category = String(req.body.category || '').trim();
+    const notes = String(req.body.notes || '').trim();
+
+    await run(
+      `
+      UPDATE Supplier
+      SET name = ?, contactPerson = ?, email = ?, phone = ?, address = ?,
+          website = ?, category = ?, notes = ?
+      WHERE id = ?
+      `,
+      [
+        name,
+        contactPerson,
+        email,
+        phone,
+        address,
+        website,
+        category,
+        notes,
+        String(req.params.id),
+      ],
+    );
+
+    await writeAuditLog({
+      type: 'UPDATED',
+      entity: name,
+      message: `Supplier ${name} information updated`,
+      user: getActorMeta(req).actorName,
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+app.patch('/api/suppliers/:id/archive', requireAdmin, async (req, res) => {
+  try {
+    const item = await archiveRecord(
+      {
+        table: 'Supplier',
+        id: req.params.id,
+        entity: (row) => row.name || 'Supplier',
+        message: (row) => `${row.name} supplier record archived`,
+        label: 'Supplier',
+      },
+      req,
+    );
+    res.json({ success: true, item });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+app.patch('/api/suppliers/:id/restore', requireAdmin, async (req, res) => {
+  try {
+    const item = await restoreRecord(
+      {
+        table: 'Supplier',
+        id: req.params.id,
+        entity: (row) => row.name || 'Supplier',
+        message: (row) => `${row.name} supplier record restored`,
+        label: 'Supplier',
+      },
+      req,
+    );
+    res.json({ success: true, item });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+app.delete('/api/suppliers/:id', requireAdmin, async (req, res) => {
+  try {
+    const existing = await queryOne('SELECT name FROM Supplier WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Supplier not found' });
+
+    await run('DELETE FROM Supplier WHERE id = ?', [String(req.params.id)]);
+
+    await writeAuditLog({
+      type: 'DELETED',
+      entity: existing.name || 'Supplier',
+      message: 'Supplier record deleted',
+      user: getActorMeta(req).actorName,
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    badRequest(res, e.message);
+  }
+});
+
+// =============================
+// REPORTS (ADMIN)
+// =============================
+
+app.get('/api/reports/unconfirmed-assignments', requireAdmin, async (_req, res) => {
+  try {
+    const notifications = await queryAll(
+      `
+      SELECT
+        n.id,
+        n.employeeId,
+        n.type,
+        n.title,
+        n.message,
+        n.metadata,
+        n.status,
+        n.createdAt,
+        e.name AS employeeName,
+        e.employeeNumber,
+        e.email,
+        e.department
+      FROM Notification n
+      LEFT JOIN Employee e ON e.id = n.employeeId
+      WHERE n.type IN ('ASSET_ASSIGNMENT', 'LICENSE_ASSIGNMENT')
+      ORDER BY n.createdAt DESC
+      `,
+    );
+
+    const now = new Date();
+    const report = notifications.map((n) => {
+      const createdAt = n.createdAt ? new Date(n.createdAt) : null;
+      const daysPending = createdAt ? Math.ceil((now - createdAt) / (1000 * 60 * 60 * 24)) : 0;
+      const metadata = n.metadata ? JSON.parse(n.metadata) : {};
+
+      let isOverdue = false;
+      let urgency = 'normal';
+
+      if (daysPending > 7) {
+        isOverdue = true;
+        urgency = 'critical';
+      } else if (daysPending > 3) {
+        urgency = 'high';
+      } else if (daysPending > 1) {
+        urgency = 'medium';
+      }
+
+      return {
+        id: n.id,
+        employeeId: n.employeeId,
+        employeeName: n.employeeName,
+        employeeNumber: n.employeeNumber,
+        employeeEmail: n.email,
+        department: n.department,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        status: n.status,
+        createdAt: n.createdAt,
+        daysPending,
+        isOverdue,
+        urgency,
+        metadata: {
+          assetId: metadata.assetId,
+          assetTag: metadata.assetTag,
+          assetName: metadata.assetName,
+          licenseId: metadata.licenseId,
+          licenseName: metadata.licenseName,
+          quantity: metadata.quantity,
+          assignedById: metadata.assignedById,
+          assignedByName: metadata.assignedByName,
+        },
+      };
+    });
+
+    const pending = report.filter((n) => n.status === 'PENDING');
+    const confirmed = report.filter((n) => n.status === 'CONFIRMED');
+    const declined = report.filter((n) => n.status === 'DECLINED');
+    const overdue = pending.filter((n) => n.daysPending > 7);
+
+    const byEmployee = {};
+    pending.forEach((n) => {
+      const key = n.employeeId;
+      if (!byEmployee[key]) {
+        byEmployee[key] = {
+          employeeId: n.employeeId,
+          employeeName: n.employeeName,
+          employeeNumber: n.employeeNumber,
+          email: n.email,
+          department: n.department,
+          pendingCount: 0,
+          overdueCount: 0,
+          notifications: [],
+        };
+      }
+      byEmployee[key].pendingCount += 1;
+      if (n.isOverdue) byEmployee[key].overdueCount += 1;
+      byEmployee[key].notifications.push(n);
+    });
+
+    const byDepartment = {};
+    pending.forEach((n) => {
+      const dept = n.department || 'Unassigned';
+      if (!byDepartment[dept]) {
+        byDepartment[dept] = { pendingCount: 0, overdueCount: 0 };
+      }
+      byDepartment[dept].pendingCount += 1;
+      if (n.isOverdue) byDepartment[dept].overdueCount += 1;
+    });
+
+    const byType = {
+      ASSET_ASSIGNMENT: { count: pending.filter((n) => n.type === 'ASSET_ASSIGNMENT').length },
+      LICENSE_ASSIGNMENT: { count: pending.filter((n) => n.type === 'LICENSE_ASSIGNMENT').length },
+    };
+
+    const byUrgency = {
+      critical: pending.filter((n) => n.urgency === 'critical').length,
+      high: pending.filter((n) => n.urgency === 'high').length,
+      medium: pending.filter((n) => n.urgency === 'medium').length,
+      normal: pending.filter((n) => n.urgency === 'normal').length,
+    };
+
+    const summary = {
+      totalNotifications: report.length,
+      pendingCount: pending.length,
+      confirmedCount: confirmed.length,
+      declinedCount: declined.length,
+      overdueCount: overdue.length,
+      confirmationRate: report.length > 0 ? Math.round((confirmed.length / report.length) * 100) : 0,
+      byEmployee: Object.values(byEmployee),
+      byDepartment,
+      byType,
+      byUrgency,
+      topOverdueEmployees: Object.values(byEmployee)
+        .filter((e) => e.overdueCount > 0)
+        .sort((a, b) => b.overdueCount - a.overdueCount)
+        .slice(0, 5),
+    };
+
+    res.json({ report, pending, confirmed, declined, summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================
+// REPORTS (ADMIN)
+// =============================
+
+app.get('/api/reports/employee-asset-history', requireAdmin, async (_req, res) => {
+  try {
+    // Get all employees
+    const employees = await queryAll(
+      `
+      SELECT
+        id,
+        name,
+        employeeNumber,
+        email,
+        department,
+        role,
+        createdAt
+      FROM Employee
+      WHERE COALESCE(isArchived, 0) = 0
+      ORDER BY department, name
+      `,
+    );
+
+    // Get all assets with assignment info
+    const assets = await queryAll(
+      `
+      SELECT
+        a.id,
+        a.tag,
+        a.name,
+        a.category,
+        a.unitCost,
+        a.status,
+        a.employeeId,
+        a.checkoutDate,
+        a.expectedCheckinDate,
+        e.name AS assignedTo,
+        e.department
+      FROM Asset a
+      LEFT JOIN Employee e ON e.id = a.employeeId
+      WHERE COALESCE(a.isArchived, 0) = 0
+      `,
+    );
+
+    // Get all license assignments
+    const licenseAssignments = await queryAll(
+      `
+      SELECT
+        la.id,
+        la.licenseId,
+        la.employeeId,
+        la.quantity,
+        la.assignedAt,
+        la.status,
+        l.name AS licenseName,
+        l.unitCost,
+        e.name AS employeeName,
+        e.department
+      FROM LicenseAssignment la
+      LEFT JOIN License l ON l.id = la.licenseId
+      LEFT JOIN Employee e ON e.id = la.employeeId
+      WHERE la.status = 'ACTIVE'
+      `,
+    );
+
+    // Get notification confirmations for assets
+    const notifications = await queryAll(
+      `
+      SELECT
+        n.id,
+        n.employeeId,
+        n.type,
+        n.status AS confirmationStatus,
+        n.confirmedAt,
+        n.createdAt,
+        n.metadata
+      FROM Notification n
+      WHERE n.type IN ('ASSET_ASSIGNMENT', 'LICENSE_ASSIGNMENT')
+      ORDER BY n.createdAt DESC
+      `,
+    );
+
+    // Build employee report
+    const report = employees.map((emp) => {
+      // Find assigned assets
+      const assignedAssets = assets.filter((a) => a.employeeId === emp.id);
+      const totalAssetValue = assignedAssets.reduce((sum, a) => sum + Number(a.unitCost || 0), 0);
+
+      // Find license assignments
+      const assignedLicenses = licenseAssignments.filter((la) => la.employeeId === emp.id);
+      const totalLicenseValue = assignedLicenses.reduce((sum, la) => sum + Number(la.unitCost || 0) * Number(la.quantity || 1), 0);
+
+      // Find notifications/confirmations for this employee
+      const empNotifications = notifications.filter((n) => n.employeeId === emp.id);
+      const pendingConfirmations = empNotifications.filter((n) => n.status === 'PENDING').length;
+      const confirmedCount = empNotifications.filter((n) => n.status === 'CONFIRMED').length;
+      const declinedCount = empNotifications.filter((n) => n.status === 'DECLINED').length;
+
+      return {
+        id: emp.id,
+        name: emp.name,
+        employeeNumber: emp.employeeNumber,
+        email: emp.email,
+        department: emp.department,
+        role: emp.role,
+        assetCount: assignedAssets.length,
+        totalAssetValue,
+        licenseCount: assignedLicenses.length,
+        totalLicenseValue,
+        totalValue: totalAssetValue + totalLicenseValue,
+        pendingConfirmations,
+        confirmedCount,
+        declinedCount,
+        assets: assignedAssets.map((a) => ({
+          id: a.id,
+          tag: a.tag,
+          name: a.name,
+          category: a.category,
+          unitCost: Number(a.unitCost || 0),
+          status: a.status,
+          checkoutDate: a.checkoutDate,
+          expectedCheckinDate: a.expectedCheckinDate,
+          confirmationStatus: 'PENDING', // Would need to join with notifications
+        })),
+        licenses: assignedLicenses.map((la) => ({
+          id: la.id,
+          licenseName: la.licenseName,
+          quantity: Number(la.quantity || 1),
+          unitCost: Number(la.unitCost || 0),
+          assignedAt: la.assignedAt,
+          status: la.status,
+        })),
+      };
+    });
+
+    // Sort by total value (descending)
+    report.sort((a, b) => b.totalValue - a.totalValue);
+
+    // Summary statistics
+    const totalEmployees = employees.length;
+    const totalAssetsAssigned = assets.filter((a) => a.employeeId).length;
+    const totalLicensesAssigned = licenseAssignments.length;
+    const totalValueAssigned = report.reduce((sum, e) => sum + e.totalValue, 0);
+    const employeesWithPendingConfirmations = report.filter((e) => e.pendingConfirmations > 0).length;
+
+    const summary = {
+      totalEmployees,
+      totalAssetsAssigned,
+      totalLicensesAssigned,
+      totalValueAssigned,
+      averageValuePerEmployee: totalEmployees > 0 ? totalValueAssigned / totalEmployees : 0,
+      employeesWithPendingConfirmations,
+      topEmployees: report.slice(0, 5),
+      byDepartment: (() => {
+        const deptStats = {};
+        report.forEach((emp) => {
+          const dept = emp.department || 'Unassigned';
+          if (!deptStats[dept]) {
+            deptStats[dept] = { employeeCount: 0, totalValue: 0, assetCount: 0, licenseCount: 0 };
+          }
+          deptStats[dept].employeeCount += 1;
+          deptStats[dept].totalValue += emp.totalValue;
+          deptStats[dept].assetCount += emp.assetCount;
+          deptStats[dept].licenseCount += emp.licenseCount;
+        });
+        return deptStats;
+      })(),
+    };
+
+    res.json({ report, summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================
+// REPORTS (ADMIN)
+// =============================
+
+app.get('/api/reports/maintenance-cost', requireAdmin, async (_req, res) => {
+  try {
+    // Get all maintenance records
+    const maintenance = await queryAll(
+      `
+      SELECT
+        m.id,
+        m.title,
+        m.description,
+        m.status,
+        m.priority,
+        m.cost,
+        m.submittedAt,
+        m.assetId,
+        m.category,
+        a.tag AS assetTag,
+        a.name AS assetName,
+        a.unitCost AS assetValue,
+        a.category AS assetCategory
+      FROM Maintenance m
+      LEFT JOIN Asset a ON a.id = m.assetId
+      WHERE COALESCE(m.isArchived, 0) = 0
+      ORDER BY m.submittedAt DESC
+      `,
+    );
+
+    // Get current year and calculate date ranges
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    // Process maintenance records
+    const report = maintenance.map((m) => {
+      const submittedAt = m.submittedAt ? new Date(m.submittedAt) : null;
+      const month = submittedAt ? submittedAt.getMonth() : null;
+      const year = submittedAt ? submittedAt.getFullYear() : null;
+      const costVsValue = m.assetValue > 0 ? (m.cost / m.assetValue) * 100 : 0;
+
+      return {
+        id: m.id,
+        title: m.title,
+        description: m.description,
+        status: m.status,
+        priority: m.priority,
+        cost: Number(m.cost || 0),
+        submittedAt: m.submittedAt,
+        month,
+        year,
+        assetId: m.assetId,
+        assetTag: m.assetTag,
+        assetName: m.assetName,
+        assetValue: Number(m.assetValue || 0),
+        assetCategory: m.assetCategory,
+        category: m.category,
+        costVsValue: Math.round(costVsValue * 100) / 100,
+        isHighCost: costVsValue > 50, // Flag if maintenance > 50% of asset value
+      };
+    });
+
+    // Calculate totals
+    const totalCost = report.reduce((sum, m) => sum + m.cost, 0);
+    const totalRecords = report.length;
+
+    // By Asset (group maintenance by asset)
+    const byAsset = {};
+    report.forEach((m) => {
+      const key = m.assetId || 'unassigned';
+      if (!byAsset[key]) {
+        byAsset[key] = {
+          assetId: m.assetId,
+          assetTag: m.assetTag,
+          assetName: m.assetName,
+          assetValue: m.assetValue,
+          assetCategory: m.assetCategory,
+          maintenanceCount: 0,
+          totalCost: 0,
+          tickets: [],
+        };
+      }
+      byAsset[key].maintenanceCount += 1;
+      byAsset[key].totalCost += m.cost;
+      byAsset[key].tickets.push({
+        id: m.id,
+        title: m.title,
+        cost: m.cost,
+        status: m.status,
+        priority: m.priority,
+        submittedAt: m.submittedAt,
+      });
+    });
+
+    // Calculate cost vs value ratio for each asset
+    Object.values(byAsset).forEach((asset) => {
+      asset.costVsValue = asset.assetValue > 0
+        ? Math.round((asset.totalCost / asset.assetValue) * 100 * 100) / 100
+        : 0;
+      asset.isHighCost = asset.costVsValue > 50;
+      asset.shouldReplace = asset.costVsValue > 100; // Maintenance costs exceed asset value
+    });
+
+    // Convert to array and sort by total cost
+    const assetsReport = Object.values(byAsset).sort((a, b) => b.totalCost - a.totalCost);
+
+    // By Month (for trend analysis - last 12 months)
+    const monthlyTrends = {};
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(currentYear, currentMonth - i, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      monthlyTrends[key] = {
+        month: date.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+        year: date.getFullYear(),
+        monthNum: date.getMonth(),
+        count: 0,
+        cost: 0,
+      };
+    }
+
+    report.forEach((m) => {
+      if (m.year !== null && m.month !== null) {
+        const key = `${m.year}-${String(m.month + 1).padStart(2, '0')}`;
+        if (monthlyTrends[key]) {
+          monthlyTrends[key].count += 1;
+          monthlyTrends[key].cost += m.cost;
+        }
+      }
+    });
+
+    const trendsArray = Object.values(monthlyTrends);
+
+    // By Priority
+    const byPriority = {
+      'Critical': { count: 0, cost: 0 },
+      'High': { count: 0, cost: 0 },
+      'Medium': { count: 0, cost: 0 },
+      'Low': { count: 0, cost: 0 },
+    };
+
+    report.forEach((m) => {
+      const priority = m.priority || 'Medium';
+      if (byPriority[priority]) {
+        byPriority[priority].count += 1;
+        byPriority[priority].cost += m.cost;
+      }
+    });
+
+    // By Status
+    const byStatus = {
+      'Open': { count: 0, cost: 0 },
+      'In Progress': { count: 0, cost: 0 },
+      'Resolved': { count: 0, cost: 0 },
+      'Closed': { count: 0, cost: 0 },
+    };
+
+    report.forEach((m) => {
+      const status = m.status || 'Open';
+      if (byStatus[status]) {
+        byStatus[status].count += 1;
+        byStatus[status].cost += m.cost;
+      }
+    });
+
+    // By Category
+    const byCategory = {};
+    report.forEach((m) => {
+      const cat = m.category || 'Other';
+      if (!byCategory[cat]) {
+        byCategory[cat] = { count: 0, cost: 0 };
+      }
+      byCategory[cat].count += 1;
+      byCategory[cat].cost += m.cost;
+    });
+
+    // High cost alerts (maintenance > 50% of asset value)
+    const highCostAssets = assetsReport.filter((a) => a.isHighCost);
+    const shouldReplaceAssets = assetsReport.filter((a) => a.shouldReplace);
+
+    // Current year vs previous year
+    const currentYearCost = report.filter((m) => m.year === currentYear).reduce((sum, m) => sum + m.cost, 0);
+    const previousYearCost = report.filter((m) => m.year === currentYear - 1).reduce((sum, m) => sum + m.cost, 0);
+
+    const summary = {
+      totalRecords,
+      totalCost,
+      averageCostPerTicket: totalRecords > 0 ? totalCost / totalRecords : 0,
+      assetsWithMaintenance: assetsReport.length,
+      highCostAssetsCount: highCostAssets.length,
+      shouldReplaceCount: shouldReplaceAssets.length,
+      byPriority,
+      byStatus,
+      byCategory,
+      trends: trendsArray,
+      currentYearCost,
+      previousYearCost,
+      yearOverYearChange: previousYearCost > 0
+        ? Math.round(((currentYearCost - previousYearCost) / previousYearCost) * 100)
+        : 0,
+      topCostlyAssets: assetsReport.slice(0, 5),
+    };
+
+    res.json({ report, assetsReport, summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================
+// REPORTS (ADMIN)
+// =============================
+
+app.get('/api/reports/department-allocation', requireAdmin, async (_req, res) => {
+  try {
+    // Get all employees with their department
+    const employees = await queryAll(
+      `
+      SELECT id, name, department, employeeNumber, role
+      FROM Employee
+      WHERE COALESCE(isArchived, 0) = 0
+      `,
+    );
+
+    // Get all assets with employee info
+    const assets = await queryAll(
+      `
+      SELECT
+        a.id,
+        a.tag,
+        a.name,
+        a.category,
+        a.unitCost,
+        a.status,
+        a.employeeId,
+        e.department
+      FROM Asset a
+      LEFT JOIN Employee e ON e.id = a.employeeId
+      WHERE COALESCE(a.isArchived, 0) = 0
+      `,
+    );
+
+    // Get all license assignments with employee info
+    const licenseAssignments = await queryAll(
+      `
+      SELECT
+        la.id,
+        la.licenseId,
+        la.employeeId,
+        la.quantity,
+        la.status,
+        l.name AS licenseName,
+        l.unitCost,
+        e.department
+      FROM LicenseAssignment la
+      LEFT JOIN License l ON l.id = la.licenseId
+      LEFT JOIN Employee e ON e.id = la.employeeId
+      WHERE la.status = 'ACTIVE'
+      `,
+    );
+
+    // Build department stats
+    const departmentStats = {};
+
+    // Initialize from employees
+    employees.forEach((emp) => {
+      const dept = emp.department || 'Unassigned';
+      if (!departmentStats[dept]) {
+        departmentStats[dept] = {
+          department: dept,
+          employeeCount: 0,
+          employees: [],
+          assetCount: 0,
+          assetValue: 0,
+          licenseSeats: 0,
+          licenseValue: 0,
+          assets: [],
+          licenses: [],
+        };
+      }
+      departmentStats[dept].employeeCount += 1;
+      departmentStats[dept].employees.push({
+        id: emp.id,
+        name: emp.name,
+        employeeNumber: emp.employeeNumber,
+      });
+    });
+
+    // Add asset data
+    assets.forEach((asset) => {
+      const dept = asset.department || 'Unassigned';
+      if (!departmentStats[dept]) {
+        departmentStats[dept] = {
+          department: dept,
+          employeeCount: 0,
+          employees: [],
+          assetCount: 0,
+          assetValue: 0,
+          licenseSeats: 0,
+          licenseValue: 0,
+          assets: [],
+          licenses: [],
+        };
+      }
+      departmentStats[dept].assetCount += 1;
+      departmentStats[dept].assetValue += Number(asset.unitCost || 0);
+      departmentStats[dept].assets.push({
+        id: asset.id,
+        tag: asset.tag,
+        name: asset.name,
+        category: asset.category,
+        unitCost: Number(asset.unitCost || 0),
+        status: asset.status,
+      });
+    });
+
+    // Add license data
+    licenseAssignments.forEach((assignment) => {
+      const dept = assignment.department || 'Unassigned';
+      if (!departmentStats[dept]) {
+        departmentStats[dept] = {
+          department: dept,
+          employeeCount: 0,
+          employees: [],
+          assetCount: 0,
+          assetValue: 0,
+          licenseSeats: 0,
+          licenseValue: 0,
+          assets: [],
+          licenses: [],
+        };
+      }
+      departmentStats[dept].licenseSeats += Number(assignment.quantity || 1);
+      departmentStats[dept].licenseValue += Number(assignment.unitCost || 0);
+      departmentStats[dept].licenses.push({
+        id: assignment.id,
+        licenseName: assignment.licenseName,
+        quantity: Number(assignment.quantity || 1),
+        unitCost: Number(assignment.unitCost || 0),
+      });
+    });
+
+    // Calculate totals and per-employee averages
+    const report = Object.values(departmentStats).map((dept) => {
+      const totalValue = dept.assetValue + dept.licenseValue;
+      const perEmployeeValue = dept.employeeCount > 0 ? totalValue / dept.employeeCount : 0;
+      const perEmployeeAssets = dept.employeeCount > 0 ? dept.assetCount / dept.employeeCount : 0;
+      const perEmployeeLicenses = dept.employeeCount > 0 ? dept.licenseSeats / dept.employeeCount : 0;
+
+      return {
+        ...dept,
+        totalValue,
+        perEmployeeValue: Math.round(perEmployeeValue * 100) / 100,
+        perEmployeeAssets: Math.round(perEmployeeAssets * 100) / 100,
+        perEmployeeLicenses: Math.round(perEmployeeLicenses * 100) / 100,
+      };
+    });
+
+    // Sort by total value (descending)
+    report.sort((a, b) => b.totalValue - a.totalValue);
+
+    // Summary statistics
+    const totalEmployees = employees.length;
+    const totalAssets = assets.length;
+    const totalAssetValue = assets.reduce((sum, a) => sum + Number(a.unitCost || 0), 0);
+    const totalLicenseSeats = licenseAssignments.reduce((sum, l) => sum + Number(l.quantity || 1), 0);
+    const totalLicenseValue = licenseAssignments.reduce((sum, l) => sum + Number(l.unitCost || 0), 0);
+
+    const summary = {
+      totalDepartments: report.length,
+      totalEmployees,
+      totalAssets,
+      totalAssetValue,
+      totalLicenseSeats,
+      totalLicenseValue,
+      totalValue: totalAssetValue + totalLicenseValue,
+      averageValuePerDepartment: report.length > 0 ? (totalAssetValue + totalLicenseValue) / report.length : 0,
+      averageValuePerEmployee: totalEmployees > 0 ? (totalAssetValue + totalLicenseValue) / totalEmployees : 0,
+      topDepartment: report.length > 0 ? report[0] : null,
+    };
+
+    res.json({ report, summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================
+// REPORTS (ADMIN)
+// =============================
+
+app.get('/api/reports/asset-valuation', requireAdmin, async (_req, res) => {
+  try {
+    const assets = await queryAll(
+      `
+      SELECT
+        a.id,
+        a.tag,
+        a.name,
+        a.category,
+        a.status,
+        a.unitCost,
+        a.location,
+        a.purchaseDate,
+        a.employeeId,
+        e.name AS assignedTo,
+        e.department,
+        a.createdAt,
+        a.isArchived
+      FROM Asset a
+      LEFT JOIN Employee e ON e.id = a.employeeId
+      WHERE COALESCE(a.isArchived, 0) = 0
+      ORDER BY a.unitCost DESC, a.purchaseDate DESC
+      `,
+    );
+
+    const today = new Date();
+    const currentYear = today.getFullYear();
+
+    const report = assets.map((asset) => {
+      const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : null;
+      const ageInDays = purchaseDate ? Math.ceil((today - purchaseDate) / (1000 * 60 * 60 * 24)) : null;
+      const ageInYears = ageInDays !== null ? Math.floor(ageInDays / 365) : null;
+      const purchaseYear = purchaseDate ? purchaseDate.getFullYear() : null;
+
+      return {
+        id: asset.id,
+        tag: asset.tag,
+        name: asset.name,
+        category: asset.category,
+        status: asset.status,
+        unitCost: Number(asset.unitCost || 0),
+        location: asset.location,
+        purchaseDate: asset.purchaseDate,
+        ageInDays,
+        ageInYears,
+        purchaseYear,
+        assignedTo: asset.assignedTo,
+        department: asset.department,
+        isArchived: Number(asset.isArchived || 0),
+      };
+    });
+
+    // Summary statistics
+    const totalValue = report.reduce((sum, a) => sum + a.unitCost, 0);
+    const totalAssets = report.length;
+
+    // By Category
+    const byCategory = {};
+    report.forEach((asset) => {
+      const cat = asset.category || 'Uncategorized';
+      if (!byCategory[cat]) {
+        byCategory[cat] = { count: 0, value: 0 };
+      }
+      byCategory[cat].count += 1;
+      byCategory[cat].value += asset.unitCost;
+    });
+
+    // By Department
+    const byDepartment = {};
+    report.forEach((asset) => {
+      const dept = asset.department || 'Unassigned';
+      if (!byDepartment[dept]) {
+        byDepartment[dept] = { count: 0, value: 0 };
+      }
+      byDepartment[dept].count += 1;
+      byDepartment[dept].value += asset.unitCost;
+    });
+
+    // By Status
+    const byStatus = {};
+    report.forEach((asset) => {
+      const status = asset.status || 'Unknown';
+      if (!byStatus[status]) {
+        byStatus[status] = { count: 0, value: 0 };
+      }
+      byStatus[status].count += 1;
+      byStatus[status].value += asset.unitCost;
+    });
+
+    // By Purchase Year
+    const byPurchaseYear = {};
+    report.forEach((asset) => {
+      const year = asset.purchaseYear || 'Unknown';
+      if (!byPurchaseYear[year]) {
+        byPurchaseYear[year] = { count: 0, value: 0 };
+      }
+      byPurchaseYear[year].count += 1;
+      byPurchaseYear[year].value += asset.unitCost;
+    });
+
+    // Age Analysis
+    const ageBrackets = {
+      '0-1 years': { count: 0, value: 0 },
+      '1-3 years': { count: 0, value: 0 },
+      '3-5 years': { count: 0, value: 0 },
+      '5+ years': { count: 0, value: 0 },
+      'Unknown': { count: 0, value: 0 },
+    };
+
+    report.forEach((asset) => {
+      if (asset.ageInYears === null) {
+        ageBrackets['Unknown'].count += 1;
+        ageBrackets['Unknown'].value += asset.unitCost;
+      } else if (asset.ageInYears < 1) {
+        ageBrackets['0-1 years'].count += 1;
+        ageBrackets['0-1 years'].value += asset.unitCost;
+      } else if (asset.ageInYears < 3) {
+        ageBrackets['1-3 years'].count += 1;
+        ageBrackets['1-3 years'].value += asset.unitCost;
+      } else if (asset.ageInYears < 5) {
+        ageBrackets['3-5 years'].count += 1;
+        ageBrackets['3-5 years'].value += asset.unitCost;
+      } else {
+        ageBrackets['5+ years'].count += 1;
+        ageBrackets['5+ years'].value += asset.unitCost;
+      }
+    });
+
+    // Current year purchases
+    const currentYearPurchases = report.filter((a) => a.purchaseYear === currentYear);
+    const previousYearPurchases = report.filter((a) => a.purchaseYear === currentYear - 1);
+
+    const summary = {
+      totalAssets,
+      totalValue,
+      averageAssetValue: totalAssets > 0 ? totalValue / totalAssets : 0,
+      byCategory,
+      byDepartment,
+      byStatus,
+      byPurchaseYear,
+      ageBrackets,
+      currentYearPurchases: {
+        count: currentYearPurchases.length,
+        value: currentYearPurchases.reduce((sum, a) => sum + a.unitCost, 0),
+      },
+      previousYearPurchases: {
+        count: previousYearPurchases.length,
+        value: previousYearPurchases.reduce((sum, a) => sum + a.unitCost, 0),
+      },
+      unassignedAssets: report.filter((a) => !a.assignedTo).length,
+      deployedAssets: report.filter((a) => a.assignedTo).length,
+    };
+
+    res.json({ report, summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/reports/asset-valuation', requireAdmin, async (_req, res) => {
+  try {
+    const assets = await queryAll(
+      `
+      SELECT
+        a.id,
+        a.tag,
+        a.name,
+        a.category,
+        a.status,
+        a.unitCost,
+        a.location,
+        a.purchaseDate,
+        a.employeeId,
+        e.name AS assignedTo,
+        e.department,
+        a.createdAt,
+        a.isArchived
+      FROM Asset a
+      LEFT JOIN Employee e ON e.id = a.employeeId
+      WHERE COALESCE(a.isArchived, 0) = 0
+      ORDER BY a.unitCost DESC, a.purchaseDate DESC
+      `,
+    );
+
+    const today = new Date();
+    const currentYear = today.getFullYear();
+
+    const report = assets.map((asset) => {
+      const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : null;
+      const ageInDays = purchaseDate ? Math.ceil((today - purchaseDate) / (1000 * 60 * 60 * 24)) : null;
+      const ageInYears = ageInDays !== null ? Math.floor(ageInDays / 365) : null;
+      const purchaseYear = purchaseDate ? purchaseDate.getFullYear() : null;
+
+      return {
+        id: asset.id,
+        tag: asset.tag,
+        name: asset.name,
+        category: asset.category,
+        status: asset.status,
+        unitCost: Number(asset.unitCost || 0),
+        location: asset.location,
+        purchaseDate: asset.purchaseDate,
+        ageInDays,
+        ageInYears,
+        purchaseYear,
+        assignedTo: asset.assignedTo,
+        department: asset.department,
+        isArchived: Number(asset.isArchived || 0),
+      };
+    });
+
+    const totalValue = report.reduce((sum, a) => sum + a.unitCost, 0);
+    const totalAssets = report.length;
+
+    const byCategory = {};
+    report.forEach((asset) => {
+      const cat = asset.category || 'Uncategorized';
+      if (!byCategory[cat]) {
+        byCategory[cat] = { count: 0, value: 0 };
+      }
+      byCategory[cat].count += 1;
+      byCategory[cat].value += asset.unitCost;
+    });
+
+    const byDepartment = {};
+    report.forEach((asset) => {
+      const dept = asset.department || 'Unassigned';
+      if (!byDepartment[dept]) {
+        byDepartment[dept] = { count: 0, value: 0 };
+      }
+      byDepartment[dept].count += 1;
+      byDepartment[dept].value += asset.unitCost;
+    });
+
+    const byStatus = {};
+    report.forEach((asset) => {
+      const status = asset.status || 'Unknown';
+      if (!byStatus[status]) {
+        byStatus[status] = { count: 0, value: 0 };
+      }
+      byStatus[status].count += 1;
+      byStatus[status].value += asset.unitCost;
+    });
+
+    const byPurchaseYear = {};
+    report.forEach((asset) => {
+      const year = asset.purchaseYear || 'Unknown';
+      if (!byPurchaseYear[year]) {
+        byPurchaseYear[year] = { count: 0, value: 0 };
+      }
+      byPurchaseYear[year].count += 1;
+      byPurchaseYear[year].value += asset.unitCost;
+    });
+
+    const ageBrackets = {
+      '0-1 years': { count: 0, value: 0 },
+      '1-3 years': { count: 0, value: 0 },
+      '3-5 years': { count: 0, value: 0 },
+      '5+ years': { count: 0, value: 0 },
+      'Unknown': { count: 0, value: 0 },
+    };
+
+    report.forEach((asset) => {
+      if (asset.ageInYears === null) {
+        ageBrackets['Unknown'].count += 1;
+        ageBrackets['Unknown'].value += asset.unitCost;
+      } else if (asset.ageInYears < 1) {
+        ageBrackets['0-1 years'].count += 1;
+        ageBrackets['0-1 years'].value += asset.unitCost;
+      } else if (asset.ageInYears < 3) {
+        ageBrackets['1-3 years'].count += 1;
+        ageBrackets['1-3 years'].value += asset.unitCost;
+      } else if (asset.ageInYears < 5) {
+        ageBrackets['3-5 years'].count += 1;
+        ageBrackets['3-5 years'].value += asset.unitCost;
+      } else {
+        ageBrackets['5+ years'].count += 1;
+        ageBrackets['5+ years'].value += asset.unitCost;
+      }
+    });
+
+    const currentYearPurchases = report.filter((a) => a.purchaseYear === currentYear);
+    const previousYearPurchases = report.filter((a) => a.purchaseYear === currentYear - 1);
+
+    const summary = {
+      totalAssets,
+      totalValue,
+      averageAssetValue: totalAssets > 0 ? totalValue / totalAssets : 0,
+      byCategory,
+      byDepartment,
+      byStatus,
+      byPurchaseYear,
+      ageBrackets,
+      currentYearPurchases: {
+        count: currentYearPurchases.length,
+        value: currentYearPurchases.reduce((sum, a) => sum + a.unitCost, 0),
+      },
+      previousYearPurchases: {
+        count: previousYearPurchases.length,
+        value: previousYearPurchases.reduce((sum, a) => sum + a.unitCost, 0),
+      },
+      unassignedAssets: report.filter((a) => !a.assignedTo).length,
+      deployedAssets: report.filter((a) => a.assignedTo).length,
+    };
+
+    res.json({ report, summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================
+// REPORTS (ADMIN)
+// =============================
+
+app.get('/api/reports/license-compliance', requireAdmin, async (_req, res) => {
+  try {
+    const licenses = await queryAll(
+      `
+      SELECT
+        l.id,
+        l.name,
+        l.manufacturer,
+        l.key,
+        l.licensedEmail,
+        l.expirationDate,
+        l.total,
+        l.avail,
+        l.unitCost,
+        l.createdAt,
+        l.isArchived
+      FROM License l
+      WHERE COALESCE(l.isArchived, 0) = 0
+      ORDER BY l.expirationDate ASC, l.name ASC
+      `,
+    );
+
+    const report = licenses.map((license) => {
+      const total = Number(license.total || 0);
+      const avail = Number(license.avail || 0);
+      const assigned = total - avail;
+      const unitCost = Number(license.unitCost || 0);
+      const expirationDate = license.expirationDate ? new Date(license.expirationDate) : null;
+      const today = new Date();
+      
+      let daysUntilExpiration = null;
+      let expirationStatus = 'valid';
+      
+      if (expirationDate) {
+        daysUntilExpiration = Math.ceil((expirationDate - today) / (1000 * 60 * 60 * 24));
+        if (daysUntilExpiration < 0) {
+          expirationStatus = 'expired';
+        } else if (daysUntilExpiration <= 30) {
+          expirationStatus = 'expiring_soon';
+        } else if (daysUntilExpiration <= 90) {
+          expirationStatus = 'expiring_90';
+        }
+      }
+
+      const utilization = total > 0 ? (assigned / total) * 100 : 0;
+      const isOverAllocated = assigned > total;
+      const totalValue = total * unitCost;
+      const assignedValue = assigned * unitCost;
+
+      return {
+        id: license.id,
+        name: license.name,
+        manufacturer: license.manufacturer,
+        licensedEmail: license.licensedEmail,
+        expirationDate: license.expirationDate,
+        daysUntilExpiration,
+        expirationStatus,
+        total,
+        assigned,
+        avail,
+        utilization: Math.round(utilization * 100) / 100,
+        unitCost,
+        totalValue,
+        assignedValue,
+        isOverAllocated,
+        isArchived: Number(license.isArchived || 0),
+      };
+    });
+
+    // Summary statistics
+    const summary = {
+      totalLicenses: report.length,
+      expiredCount: report.filter((r) => r.expirationStatus === 'expired').length,
+      expiringSoonCount: report.filter((r) => r.expirationStatus === 'expiring_soon').length,
+      expiring90Count: report.filter((r) => r.expirationStatus === 'expiring_90').length,
+      overAllocatedCount: report.filter((r) => r.isOverAllocated).length,
+      totalValue: report.reduce((sum, r) => sum + r.totalValue, 0),
+      assignedValue: report.reduce((sum, r) => sum + r.assignedValue, 0),
+      averageUtilization: report.length > 0
+        ? Math.round((report.reduce((sum, r) => sum + r.utilization, 0) / report.length) * 100) / 100
+        : 0,
+    };
+
+    res.json({ report, summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -3291,6 +4697,7 @@ const ensureEmployeeEncryptedColumns = async () => {
 
 const start = async () => {
   await ensureNotificationTable();
+  await ensureLicenseAssignmentTable();
   await ensureEmployeeVerificationColumns();
   await ensurePasswordResetColumns();
   await ensureEmployeeEncryptedColumns();
@@ -3301,7 +4708,13 @@ const start = async () => {
   });
 };
 
-
+// Production error handler
+if (process.env.NODE_ENV === 'production') {
+  app.use((err, req, res, next) => {
+    console.error('Error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  });
+}
 
 start().catch((err) => {
   console.error('Failed to start server:', err.message);

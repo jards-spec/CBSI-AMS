@@ -10,6 +10,7 @@ import {
   Edit2,
   Archive,
   RotateCcw,
+  DollarSign,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
@@ -41,6 +42,7 @@ const defaultForm = {
   priority: 'Medium' as Ticket['priority'],
   category: 'Hardware' as Ticket['category'],
   assetId: '',
+  cost: 0,
 };
 
 const Maintenance = () => {
@@ -113,7 +115,7 @@ const Maintenance = () => {
       submittedBy: editingTicket?.submittedBy || currentUser.name,
       submittedById: editingTicket?.submittedById || currentUser.id,
       submittedAt: editingTicket?.submittedAt || new Date().toISOString(),
-      cost: editingTicket?.cost || 0,
+      cost: formData.cost || editingTicket?.cost || 0,
     };
 
     try {
@@ -138,6 +140,7 @@ const Maintenance = () => {
       priority: ticket.priority,
       category: ticket.category,
       assetId: ticket.assetId || '',
+      cost: ticket.cost || 0,
     });
     setIsModalOpen(true);
   };
@@ -342,6 +345,12 @@ const Maintenance = () => {
                       <span>{ticket.category}</span>
                       <span>By: {ticket.submittedBy}</span>
                       <span>{new Date(ticket.submittedAt).toLocaleDateString()}</span>
+                      {ticket.cost !== undefined && ticket.cost > 0 && (
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                          <DollarSign size={10} />
+                          {ticket.cost.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -481,16 +490,33 @@ const Maintenance = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
-                  Asset ID (Optional)
-                </label>
-                <input
-                  className="w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-900 outline-none transition-all focus:border-red-600 dark:border-slate-800 dark:bg-[#05070a] dark:text-white"
-                  placeholder="Related asset identifier"
-                  value={formData.assetId}
-                  onChange={(event) => setFormData({ ...formData, assetId: event.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+                    Asset ID (Optional)
+                  </label>
+                  <input
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-900 outline-none transition-all focus:border-red-600 dark:border-slate-800 dark:bg-[#05070a] dark:text-white"
+                    placeholder="Related asset identifier"
+                    value={formData.assetId}
+                    onChange={(event) => setFormData({ ...formData, assetId: event.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
+                    Maintenance Cost (₱)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-900 outline-none transition-all focus:border-red-600 dark:border-slate-800 dark:bg-[#05070a] dark:text-white"
+                    placeholder="0.00"
+                    value={formData.cost || ''}
+                    onChange={(event) => setFormData({ ...formData, cost: parseFloat(event.target.value) || 0 })}
+                  />
+                </div>
               </div>
 
               <div className="flex gap-4 pt-4">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Package, XCircle } from 'lucide-react';
+import { Bell, Package, XCircle, CheckCircle2, Ban } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 
@@ -19,9 +19,7 @@ const NotificationBell = () => {
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false);
-      }
+      if (e.key === 'Escape' && isOpen) setIsOpen(false);
     };
 
     window.addEventListener('keydown', handleEsc);
@@ -46,12 +44,9 @@ const NotificationBell = () => {
 
       {isOpen ? (
         <>
-          <div
-            className="fixed inset-0 z-[240] bg-black/50 backdrop-blur-sm"
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 z-[240] bg-black/45 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
           <aside
-            className="fixed right-0 top-0 z-[250] h-screen w-full max-w-[440px] border-l border-slate-300 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f121d]"
+            className="fixed right-0 top-0 z-[250] h-screen w-full max-w-[460px] border-l border-slate-300 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0f121d]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 border-b border-slate-300 bg-white p-5 dark:border-slate-800 dark:bg-[#0f121d]">
@@ -102,9 +97,11 @@ const NotificationBell = () => {
                 </div>
               ) : (
                 notifications.map((notification) => {
-                  const isUnread = Number(notification.isRead || 0) === 0;
                   const status = String(notification.status || 'PENDING').toUpperCase();
-                  const isAssignment = notification.type === 'ASSET_ASSIGNMENT';
+                  const isUnread = Number(notification.isRead || 0) === 0;
+                  const isActionable =
+                    (notification.type === 'ASSET_ASSIGNMENT' || notification.type === 'LICENSE_ASSIGNMENT') &&
+                    status === 'PENDING';
 
                   return (
                     <div
@@ -120,14 +117,19 @@ const NotificationBell = () => {
                             {notification.type}
                           </p>
                         </div>
-                        <span className="rounded-md border border-yellow-600/40 bg-yellow-600/10 px-2 py-1 text-[9px] font-black uppercase text-yellow-700 dark:text-yellow-500">
-                          {status === 'CONFIRMED'
-                            ? 'Confirmed'
-                            : status === 'DECLINED'
-                              ? 'Declined'
-                              : isUnread
-                                ? 'Unread'
-                                : 'Read'}
+
+                        <span
+                          className={`rounded-md px-2 py-1 text-[9px] font-black uppercase ${
+                            status === 'CONFIRMED'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              : status === 'DECLINED'
+                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                : isUnread
+                                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-500'
+                                  : 'bg-slate-300/50 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                          }`}
+                        >
+                          {status === 'PENDING' ? (isUnread ? 'Unread' : 'Read') : status}
                         </span>
                       </div>
 
@@ -140,18 +142,20 @@ const NotificationBell = () => {
                       </p>
 
                       <div className="mt-3 flex gap-2 border-t border-slate-300 pt-3 dark:border-slate-800">
-                        {isAssignment && status === 'PENDING' ? (
+                        {isActionable ? (
                           <>
                             <button
                               onClick={() => void confirmNotification(notification.id)}
-                              className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-700"
+                              className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-700"
                             >
+                              <CheckCircle2 size={12} />
                               Confirm Receipt
                             </button>
                             <button
                               onClick={() => void declineNotification(notification.id)}
-                              className="flex-1 rounded-lg bg-slate-300 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-800 hover:bg-slate-400 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                              className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-300 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-800 hover:bg-slate-400 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                             >
+                              <Ban size={12} />
                               Decline
                             </button>
                           </>
