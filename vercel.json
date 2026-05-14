@@ -4,7 +4,6 @@
       "maxDuration": 30
     }
   },
-  "cors": true,
   "env": {
     "NODE_ENV": "production"
   },
