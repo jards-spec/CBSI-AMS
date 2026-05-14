@@ -93,7 +93,7 @@ const Reports = () => {
       {/* Print Footer (Only visible when printing) */}
       <div className="print-footer" style={{ display: 'none' }}>
         <p>CentralBooks Vantage Asset Management System | Generated: {new Date().toLocaleString()}</p>
-        <p>Page <span class="page-number"></span> of <span class="total-pages"></span></p>
+        <p>Page <span className="page-number"></span> of <span className="total-pages"></span></p>
       </div>
     </div>
   );
