@@ -1,0 +1,229 @@
+/* ====================================
+   PRINT STYLES - Hide Everything Except Report Content
+   ==================================== */
+
+@media print {
+  /* Hide sidebar/navigation */
+  aside,
+  nav,
+  [class*="sidebar"],
+  [class*="navigation"],
+  [class*="side-nav"],
+  aside[class*="z-"] {
+    display: none !important;
+    width: 0 !important;
+    visibility: hidden !important;
+  }
+
+  /* Hide header */
+  header,
+  [class*="header"],
+  header[class*="z-"] {
+    display: none !important;
+    height: 0 !important;
+    visibility: hidden !important;
+  }
+
+  /* Hide footer */
+  footer {
+    display: none !important;
+  }
+
+  /* Hide all buttons */
+  button,
+  [class*="button"],
+  [role="button"],
+  .print-button,
+  [class*="Print"] {
+    display: none !important;
+  }
+
+  /* Hide tabs */
+  [class*="tab"],
+  [role="tablist"] {
+    display: none !important;
+  }
+
+  /* Hide any element with no-print class */
+  .no-print,
+  [class*="no-print"] {
+    display: none !important;
+  }
+
+  /* Hide dark mode elements */
+  .dark,
+  [class*="dark:"] {
+    display: none !important;
+  }
+
+  /* Main content - full width */
+  main,
+  main[class*="flex-"],
+  [class*="overflow-y-auto"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Remove background colors */
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  /* Typography */
+  h1 {
+    font-size: 16pt !important;
+    color: #000000 !important;
+    margin-bottom: 10px !important;
+    page-break-after: avoid !important;
+  }
+
+  h2 {
+    font-size: 14pt !important;
+    color: #000000 !important;
+    page-break-after: avoid !important;
+  }
+
+  h3, h4, h5, h6 {
+    font-size: 12pt !important;
+    color: #000000 !important;
+    page-break-after: avoid !important;
+  }
+
+  p {
+    font-size: 10pt !important;
+    color: #000000 !important;
+  }
+
+  /* Tables - Black borders */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  th {
+    background-color: #f0f0f0 !important;
+    color: #000000 !important;
+    font-weight: bold !important;
+    padding: 6px !important;
+    border: 1px solid #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  td {
+    padding: 5px !important;
+    border: 1px solid #cccccc !important;
+    font-size: 9pt !important;
+    color: #000000 !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* Summary cards - inline blocks */
+  [class*="SummaryCard"],
+  [class*="summary-card"],
+  [class*="grid-cols"] > div[class*="rounded-2xl"] {
+    display: inline-block !important;
+    width: 22% !important;
+    margin: 1% !important;
+    padding: 8px !important;
+    border: 1px solid #cccccc !important;
+    background: #f9f9f9 !important;
+    page-break-inside: avoid !important;
+    box-shadow: none !important;
+    border-radius: 4px !important;
+  }
+
+  /* Remove all shadows and rounded corners */
+  [class*="shadow"],
+  [class*="rounded"] {
+    box-shadow: none !important;
+    border-radius: 4px !important;
+  }
+
+  /* Remove Tailwind colors for print */
+  [class*="text-red"],
+  [class*="text-blue"],
+  [class*="text-green"],
+  [class*="text-orange"],
+  [class*="text-yellow"] {
+    color: #000000 !important;
+  }
+
+  [class*="bg-red"],
+  [class*="bg-blue"],
+  [class*="bg-green"],
+  [class*="bg-orange"],
+  [class*="bg-yellow"] {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Print header - visible only in print */
+  .print-header {
+    display: block !important;
+    margin-bottom: 15px !important;
+    border-bottom: 2px solid #000000 !important;
+    padding-bottom: 10px !important;
+  }
+
+  /* Print footer - visible only in print */
+  .print-footer {
+    display: block !important;
+    margin-top: 20px !important;
+    border-top: 1px solid #000000 !important;
+    padding-top: 10px !important;
+    font-size: 8pt !important;
+    color: #666666 !important;
+  }
+
+  /* Page breaks */
+  .page-break-before {
+    page-break-before: always !important;
+  }
+
+  .page-break-after {
+    page-break-after: always !important;
+  }
+
+  .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+  }
+
+  /* Hide scrollbars */
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Force white background for all containers */
+  div, section, article, main {
+    background: #ffffff !important;
+  }
+}
+
+/* Print header/footer - hidden on screen */
+.print-header,
+.print-footer {
+  display: none !important;
+}
+
+/* Print button - hidden when printing */
+@media print {
+  .print-button {
+    display: none !important;
+  }
+}

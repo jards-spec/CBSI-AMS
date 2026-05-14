@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Download,
   Package,
@@ -11,6 +11,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  Printer,
+  X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { api } from '../../lib/api';
@@ -43,9 +45,73 @@ type Summary = {
   ageBrackets: Record<string, { count: number; value: number }>;
   currentYearPurchases: { count: number; value: number };
   previousYearPurchases: { count: number; value: number };
-  unassignedAssets: number;
-  deployedAssets: number;
+  yearOverYearChange: number;
+  topEmployees: any[];
 };
+
+const PRINT_STYLE = `
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  @media print {
+    html, body, #root {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: auto !important;
+      overflow: visible !important;
+      background: #fff !important;
+      color: #000 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body * {
+      visibility: hidden !important;
+    }
+
+    #print-region, #print-region * {
+      visibility: visible !important;
+    }
+
+    #print-region {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 6mm !important;
+      box-sizing: border-box !important;
+      overflow: visible !important;
+      background: #fff !important;
+      color: #000 !important;
+    }
+
+    .no-print {
+      display: none !important;
+    }
+
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+    }
+
+    th, td {
+      border: 1px solid #000 !important;
+      padding: 5px !important;
+      font-size: 9px !important;
+    }
+
+    th {
+      background: #f0f0f0 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+  }
+`;
 
 const AssetValuationReport = () => {
   const [data, setData] = useState<AssetValuationData[]>([]);
@@ -53,6 +119,18 @@ const AssetValuationReport = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'overview' | 'assets' | 'categories' | 'departments' | 'age'>('overview');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const printRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = PRINT_STYLE;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const refresh = async () => {
     setLoading(true);
@@ -72,41 +150,124 @@ const AssetValuationReport = () => {
     refresh();
   }, []);
 
-  const exportToCSV = () => {
-    const headers = [
-      'Asset Tag',
-      'Name',
-      'Category',
-      'Status',
-      'Value',
-      'Purchase Date',
-      'Age (Years)',
-      'Assigned To',
-      'Department',
-      'Location',
-    ];
+  const filteredData = React.useMemo(() => {
+    let filtered = [...data];
 
-    const rows = data.map((r) => [
-      r.tag,
-      r.name,
-      r.category,
-      r.status,
-      r.unitCost.toFixed(2),
-      r.purchaseDate || 'N/A',
-      r.ageInYears ?? 'N/A',
-      r.assignedTo || 'Unassigned',
-      r.department || 'Unassigned',
-      r.location,
-    ]);
+    // Filter by purchase date range
+    if (startDate || endDate) {
+      filtered = filtered.filter((item) => {
+        const itemDate = item.purchaseDate ? new Date(item.purchaseDate) : null;
+        if (!itemDate) return false;
+        
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        
+        if (start && itemDate < start) return false;
+        if (end && itemDate > end) return false;
+        
+        return true;
+      });
+    }
 
-    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `asset-valuation-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    return filtered;
+  }, [data, startDate, endDate]);
+
+  const buildPrintHtml = (tableHTML: string) => {
+    const dateRangeText = startDate && endDate 
+      ? `Date Range: ${startDate} to ${endDate}`
+      : startDate 
+      ? `From: ${startDate}`
+      : endDate
+      ? `To: ${endDate}`
+      : 'All Dates';
+    
+    const summaryData = `Generated: ${new Date().toLocaleString()}  •  ${dateRangeText}  •  Total Assets: ${filteredData.length}  •  Total Value: ${formatCurrency(summary?.totalValue || 0)}`;
+    
+    return `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Asset Valuation Report</title>
+          <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            body { font-family: Arial, sans-serif; color: #000; margin: 0; }
+            h1 { font-size: 18px; margin: 0 0 8px 0; }
+            .meta { font-size: 12px; margin-bottom: 12px; color: #666; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td {
+              border: 1px solid #000;
+              padding: 6px 8px;
+              font-size: 10px;
+            }
+            th { background: #f0f0f0; text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h1>Asset Valuation Report</h1>
+          <div class="meta">${summaryData}</div>
+          ${tableHTML}
+        </body>
+      </html>
+    `;
+  };
+
+  const handlePrint = () => {
+    if (filteredData.length === 0) {
+      alert('No data to print. Please adjust your filters.');
+      return;
+    }
+
+    const printWindow = window.open('about:blank', '_blank');
+    if (!printWindow) {
+      alert('Popup blocked. Please allow popups for this site to print.');
+      return;
+    }
+
+    const tableHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Tag</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Value</th>
+            <th>Purchase Date</th>
+            <th>Age</th>
+            <th>Assigned To</th>
+            <th>Department</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredData.map(item => `
+            <tr>
+              <td>${item.tag}</td>
+              <td>${item.name}</td>
+              <td>${item.category}</td>
+              <td>${item.status}</td>
+              <td>₱${item.unitCost.toFixed(2)}</td>
+              <td>${item.purchaseDate || 'N/A'}</td>
+              <td>${item.ageInYears !== null ? item.ageInYears + 'y' : 'N/A'}</td>
+              <td>${item.assignedTo || 'Unassigned'}</td>
+              <td>${item.department || 'Unassigned'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(buildPrintHtml(tableHTML));
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 200);
+    };
   };
 
   const formatCurrency = (value: number) => {
@@ -127,448 +288,381 @@ const AssetValuationReport = () => {
     });
   };
 
+  const handleClearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setViewMode('overview');
+  };
+
+  const hasActiveFilters = startDate || endDate;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-20">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Asset Valuation Report
-          </h1>
-          <p className="mt-1 text-xs italic text-slate-600 dark:text-slate-500">
-            Track asset values, categories, departments, and age analysis.
+      {/* Print Region */}
+      <div id="print-region" ref={printRef} className="hidden">
+        <div className="mb-6 border-b-2 border-black pb-3">
+          <h1 className="text-xl font-bold">Asset Valuation Report</h1>
+          <p className="text-xs mt-1">Generated: {new Date().toLocaleString()}</p>
+          <p className="text-xs">
+            {startDate && endDate 
+              ? `Date Range: ${startDate} to ${endDate}`
+              : startDate 
+              ? `From: ${startDate}`
+              : endDate
+              ? `To: ${endDate}`
+              : 'All Dates'}
+            {'  •  '}
+            Total Assets: {filteredData.length}
+            {'  •  '}
+            Total Value: {formatCurrency(summary?.totalValue || 0)}
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={exportToCSV}
-            disabled={loading || data.length === 0}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-700 shadow-lg transition-all hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-[#0f121d] dark:text-slate-300 dark:hover:bg-[#161b22]"
-          >
-            <Download size={14} /> Export CSV
-          </button>
-          <button
-            onClick={refresh}
-            disabled={loading}
-            className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-all active:scale-95 hover:bg-red-700 disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
-        </div>
-      </div>
-
-      {/* View Mode Tabs */}
-      <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-800 dark:bg-[#0f121d]">
-        {(['overview', 'assets', 'categories', 'departments', 'age'] as const).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            className={cn(
-              'rounded-lg px-4 py-2 text-[9px] font-black uppercase tracking-wider transition-all',
-              viewMode === mode
-                ? 'bg-red-600 text-white'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-500 dark:hover:text-white',
-            )}
-          >
-            {mode}
-          </button>
-        ))}
-      </div>
-
-      {/* Error State */}
-      {error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-center">
-          <p className="text-sm font-bold text-red-500">{error}</p>
-          <button
-            onClick={refresh}
-            className="mt-2 text-[10px] font-black uppercase tracking-wider text-red-400 hover:text-red-300"
-          >
-            Try Again
-          </button>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
-        </div>
-      )}
-
-      {/* OVERVIEW VIEW */}
-      {!loading && !error && viewMode === 'overview' && summary && (
-        <div className="space-y-6">
-          {/* Top Summary Cards */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
-            <SummaryCard
-              icon={<Package size={18} />}
-              label="Total Assets"
-              value={summary.totalAssets.toLocaleString()}
-              color="cyan"
-            />
-            <SummaryCard
-              icon={<span className="text-lg font-bold">₱</span>}
-              label="Total Value"
-              value={formatCurrency(summary.totalValue)}
-              color="emerald"
-            />
-            <SummaryCard
-              icon={<TrendingUp size={18} />}
-              label="Avg Asset Value"
-              value={formatCurrency(summary.averageAssetValue)}
-              color="blue"
-            />
-            <SummaryCard
-              icon={<CheckCircle size={18} />}
-              label="Deployed"
-              value={summary.deployedAssets.toLocaleString()}
-              color="emerald"
-              subtitle={`${Math.round((summary.deployedAssets / summary.totalAssets) * 100)}% utilization`}
-            />
-            <SummaryCard
-              icon={<AlertCircle size={18} />}
-              label="Unassigned"
-              value={summary.unassignedAssets.toLocaleString()}
-              color="orange"
-            />
-            <SummaryCard
-              icon={<Calendar size={18} />}
-              label={`Purchased ${new Date().getFullYear()}`}
-              value={summary.currentYearPurchases.count.toLocaleString()}
-              color="purple"
-              subtitle={formatCurrency(summary.currentYearPurchases.value)}
-            />
-          </div>
-
-          {/* Category Breakdown */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]">
-              <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                <PieChart size={16} /> Value by Category
-              </h3>
-              <div className="space-y-3">
-                {Object.entries(summary.byCategory)
-                  .sort((a, b) => b[1].value - a[1].value)
-                  .map(([category, stats]) => (
-                    <div key={category} className="space-y-1">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-bold uppercase text-slate-700 dark:text-slate-300">{category}</span>
-                        <span className="font-mono font-bold text-slate-900 dark:text-white">
-                          {formatCurrency(stats.value)}
-                        </span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                        <div
-                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
-                          style={{ width: `${(stats.value / summary.totalValue) * 100}%` }}
-                        />
-                      </div>
-                      <div className="text-[9px] text-slate-500">{stats.count} assets</div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]">
-              <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                <Users size={16} /> Value by Department
-              </h3>
-              <div className="space-y-3">
-                {Object.entries(summary.byDepartment)
-                  .sort((a, b) => b[1].value - a[1].value)
-                  .slice(0, 8)
-                  .map(([dept, stats]) => (
-                    <div key={dept} className="space-y-1">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-bold uppercase text-slate-700 dark:text-slate-300">{dept}</span>
-                        <span className="font-mono font-bold text-slate-900 dark:text-white">
-                          {formatCurrency(stats.value)}
-                        </span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                        <div
-                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-500"
-                          style={{ width: `${(stats.value / summary.totalValue) * 100}%` }}
-                        />
-                      </div>
-                      <div className="text-[9px] text-slate-500">{stats.count} assets</div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Age & Purchase Trends */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]">
-              <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                <Clock size={16} /> Asset Age Distribution
-              </h3>
-              <div className="space-y-3">
-                {Object.entries(summary.ageBrackets).map(([bracket, stats]) => (
-                  <div key={bracket} className="flex items-center justify-between rounded-lg bg-slate-50 p-3 dark:bg-white/5">
-                    <span className="text-[10px] font-bold uppercase text-slate-700 dark:text-slate-300">{bracket}</span>
-                    <div className="flex items-center gap-4">
-                      <span className="text-[9px] text-slate-500">{stats.count} assets</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">
-                        {formatCurrency(stats.value)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]">
-              <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                <BarChart3 size={16} /> Purchase Trends
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 p-4 dark:bg-emerald-500/5">
-                  <div>
-                    <div className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400">
-                      Current Year ({new Date().getFullYear()})
-                    </div>
-                    <div className="text-[10px] text-emerald-700 dark:text-emerald-300">
-                      {summary.currentYearPurchases.count} assets purchased
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">
-                      {formatCurrency(summary.currentYearPurchases.value)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-lg bg-blue-500/10 p-4 dark:bg-blue-500/5">
-                  <div>
-                    <div className="text-[9px] font-black uppercase text-blue-600 dark:text-blue-400">
-                      Previous Year ({new Date().getFullYear() - 1})
-                    </div>
-                    <div className="text-[10px] text-blue-700 dark:text-blue-300">
-                      {summary.previousYearPurchases.count} assets purchased
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-black text-blue-600 dark:text-blue-400">
-                      {formatCurrency(summary.previousYearPurchases.value)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-lg bg-slate-100 p-4 dark:bg-white/5">
-                  <div>
-                    <div className="text-[9px] font-black uppercase text-slate-600 dark:text-slate-400">
-                      Year-over-Year Change
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    {summary.previousYearPurchases.value > 0 ? (
-                      <div
-                        className={cn(
-                          'text-lg font-black',
-                          summary.currentYearPurchases.value >= summary.previousYearPurchases.value
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-red-600 dark:text-red-400',
-                        )}
-                      >
-                        {summary.currentYearPurchases.value >= summary.previousYearPurchases.value ? '+' : ''}
-                        {Math.round(
-                          ((summary.currentYearPurchases.value - summary.previousYearPurchases.value) /
-                            summary.previousYearPurchases.value) *
-                            100,
-                        )}
-                        %
-                      </div>
-                    ) : (
-                      <div className="text-lg font-black text-slate-600 dark:text-slate-400">N/A</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ASSETS TABLE VIEW */}
-      {!loading && !error && viewMode === 'assets' && data.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-[#0f121d] dark:shadow-2xl">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-100 text-[8px] font-black uppercase tracking-widest text-slate-600 dark:border-slate-800 dark:bg-[#161b22] dark:text-slate-500">
-                <th className="px-4 py-3">Tag</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Value</th>
-                <th className="px-4 py-3">Purchase Date</th>
-                <th className="px-4 py-3 text-center">Age</th>
-                <th className="px-4 py-3">Assigned To</th>
-                <th className="px-4 py-3">Department</th>
+        
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className="border border-black px-2 py-1 text-left">Tag</th>
+              <th className="border border-black px-2 py-1 text-left">Name</th>
+              <th className="border border-black px-2 py-1 text-left">Category</th>
+              <th className="border border-black px-2 py-1 text-center">Status</th>
+              <th className="border border-black px-2 py-1 text-right">Value</th>
+              <th className="border border-black px-2 py-1 text-left">Purchase Date</th>
+              <th className="border border-black px-2 py-1 text-center">Age</th>
+              <th className="border border-black px-2 py-1 text-left">Assigned To</th>
+              <th className="border border-black px-2 py-1 text-left">Department</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((asset) => (
+              <tr key={asset.id}>
+                <td className="border border-black px-2 py-1">{asset.tag}</td>
+                <td className="border border-black px-2 py-1">{asset.name}</td>
+                <td className="border border-black px-2 py-1">{asset.category}</td>
+                <td className="border border-black px-2 py-1 text-center">{asset.status}</td>
+                <td className="border border-black px-2 py-1 text-right">₱{asset.unitCost.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1">{asset.purchaseDate || 'N/A'}</td>
+                <td className="border border-black px-2 py-1 text-center">{asset.ageInYears !== null ? asset.ageInYears + 'y' : 'N/A'}</td>
+                <td className="border border-black px-2 py-1">{asset.assignedTo || 'Unassigned'}</td>
+                <td className="border border-black px-2 py-1">{asset.department || 'Unassigned'}</td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/30">
-              {data.map((asset) => (
-                <tr key={asset.id} className="text-[10px] transition-colors hover:bg-slate-50 dark:hover:bg-white/2">
-                  <td className="px-4 py-4 font-mono font-bold text-cyan-700 dark:text-cyan-400">{asset.tag}</td>
-                  <td className="px-4 py-4 font-bold text-slate-900 dark:text-white">{asset.name}</td>
-                  <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{asset.category}</td>
-                  <td className="px-4 py-4">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[8px] font-black uppercase dark:bg-white/10">
-                      {asset.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-right font-mono font-bold text-slate-900 dark:text-white">
-                    {formatCurrency(asset.unitCost)}
-                  </td>
-                  <td className="px-4 py-4 font-mono text-[10px] text-slate-600 dark:text-slate-400">
-                    {formatDate(asset.purchaseDate)}
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    {asset.ageInYears !== null ? (
-                      <span className="font-mono text-slate-600 dark:text-slate-400">{asset.ageInYears}y</span>
-                    ) : (
-                      <span className="text-slate-400">N/A</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
-                    {asset.assignedTo || <span className="text-slate-400">Unassigned</span>}
-                  </td>
-                  <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
-                    {asset.department || <span className="text-slate-400">Unassigned</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* CATEGORIES VIEW */}
-      {!loading && !error && viewMode === 'categories' && summary && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(summary.byCategory)
-            .sort((a, b) => b[1].value - a[1].value)
-            .map(([category, stats]) => (
-              <div
-                key={category}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]"
-              >
-                <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                  {category}
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500">Total Value</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(stats.value)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500">Asset Count</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{stats.count}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500">Avg Value</span>
-                    <span className="font-mono text-slate-600 dark:text-slate-400">
-                      {formatCurrency(stats.value / stats.count)}
-                    </span>
-                  </div>
-                </div>
-              </div>
             ))}
-        </div>
-      )}
+          </tbody>
+        </table>
 
-      {/* DEPARTMENTS VIEW */}
-      {!loading && !error && viewMode === 'departments' && summary && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(summary.byDepartment)
-            .sort((a, b) => b[1].value - a[1].value)
-            .map(([dept, stats]) => (
-              <div
-                key={dept}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]"
-              >
-                <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                  {dept}
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500">Total Value</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(stats.value)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500">Asset Count</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{stats.count}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500">Avg Value</span>
-                    <span className="font-mono text-slate-600 dark:text-slate-400">
-                      {formatCurrency(stats.value / stats.count)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+        <div className="mt-8 pt-4 border-t-2 border-black text-xs text-gray-600">
+          <p>CentralBooks Vantage Asset Management System</p>
+          <p>Generated: {new Date().toLocaleString()}</p>
         </div>
-      )}
+      </div>
 
-      {/* AGE VIEW */}
-      {!loading && !error && viewMode === 'age' && summary && (
-        <div className="space-y-4">
-          {Object.entries(summary.ageBrackets).map(([bracket, stats]) => (
-            <div
-              key={bracket}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]"
+      {/* Screen View */}
+      <div className="no-print">
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Asset Valuation Report
+            </h1>
+            <p className="mt-1 text-xs italic text-slate-600 dark:text-slate-500">
+              Track asset values, categories, departments, and age analysis.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handlePrint}
+              disabled={loading || filteredData.length === 0}
+              className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-all active:scale-95 hover:bg-red-700 disabled:opacity-50"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                    {bracket}
-                  </h3>
-                  <p className="text-[10px] text-slate-500">{stats.count} assets in this age range</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-black text-slate-900 dark:text-white">
-                    {formatCurrency(stats.value)}
-                  </div>
-                  <p className="text-[10px] text-slate-500">Total Value</p>
-                </div>
-              </div>
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                <div
-                  className={cn(
-                    'h-full transition-all',
-                    bracket === '0-1 years'
-                      ? 'bg-emerald-500'
-                      : bracket === '1-3 years'
-                      ? 'bg-cyan-500'
-                      : bracket === '3-5 years'
-                      ? 'bg-orange-500'
-                      : bracket === '5+ years'
-                      ? 'bg-red-500'
-                      : 'bg-slate-500',
-                  )}
-                  style={{ width: `${(stats.value / summary.totalValue) * 100}%` }}
-                />
-              </div>
+              <Printer size={14} /> Print
+            </button>
+            <button
+              onClick={refresh}
+              disabled={loading}
+              className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_0_15px_rgba(220,38,38,0.2)] transition-all active:scale-95 hover:bg-red-700 disabled:opacity-50"
+            >
+              {loading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
+
+        {/* Date Range Filter */}
+        <div className="no-print rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-800 dark:bg-[#0f121d]">
+          <div className="flex items-start gap-3 mb-3">
+            <Calendar size={18} className="mt-0.5 shrink-0 text-red-600" />
+            <div>
+              <p className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Filter by Purchase Date Range
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Select a date range to filter assets by purchase date.
+              </p>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="flex overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg dark:border-slate-800 dark:bg-[#05070a]">
+              <div className="flex shrink-0 items-center border-r border-slate-300 bg-slate-100 px-4 text-[8px] font-black uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:bg-slate-800/30">
+                From
+              </div>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 outline-none dark:text-white"
+              />
+              {startDate && (
+                <button onClick={() => setStartDate('')} className="px-3 text-slate-600 hover:text-slate-900 dark:hover:text-white">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="flex overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg dark:border-slate-800 dark:bg-[#05070a]">
+              <div className="flex shrink-0 items-center border-r border-slate-300 bg-slate-100 px-4 text-[8px] font-black uppercase tracking-widest text-slate-500 dark:border-slate-800 dark:bg-slate-800/30">
+                To
+              </div>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="flex-1 bg-transparent px-4 py-3 text-xs text-slate-900 outline-none dark:text-white"
+              />
+              {endDate && (
+                <button onClick={() => setEndDate('')} className="px-3 text-slate-600 hover:text-slate-900 dark:hover:text-white">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {hasActiveFilters && (
+                <button
+                  onClick={handleClearFilters}
+                  className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-[9px] font-black uppercase tracking-widest text-red-600 transition-all hover:bg-red-50 dark:border-slate-800 dark:text-red-500 dark:hover:bg-red-600/10"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* View Mode Tabs */}
+        <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-800 dark:bg-[#0f121d]">
+          {(['overview', 'assets', 'categories', 'departments', 'age'] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={cn(
+                'rounded-lg px-4 py-2 text-[9px] font-black uppercase tracking-wider transition-all',
+                viewMode === mode
+                  ? 'bg-red-600 text-white'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-500 dark:hover:text-white',
+              )}
+            >
+              {mode}
+            </button>
           ))}
         </div>
-      )}
 
-      {/* Empty States */}
-      {!loading && !error && data.length === 0 && viewMode !== 'overview' && (
-        <div className="flex flex-col items-center justify-center py-20">
-          <Package size={48} className="mb-4 text-slate-300 dark:text-slate-600" />
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">No assets found</p>
-        </div>
-      )}
+        {/* Error State */}
+        {error && (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-center">
+            <p className="text-sm font-bold text-red-500">{error}</p>
+            <button
+              onClick={refresh}
+              className="mt-2 text-[10px] font-black uppercase tracking-wider text-red-400 hover:text-red-300"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
+          </div>
+        )}
+
+        {/* OVERVIEW VIEW */}
+        {!loading && !error && viewMode === 'overview' && summary && (
+          <div className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
+              <SummaryCard
+                icon={<Package size={18} />}
+                label="Total Assets"
+                value={summary.totalAssets}
+                color="cyan"
+              />
+              <SummaryCard
+                icon={<DollarSign size={18} />}
+                label="Total Value"
+                value={formatCurrency(summary.totalValue)}
+                color="emerald"
+              />
+              <SummaryCard
+                icon={<TrendingUp size={18} />}
+                label="Avg Asset Value"
+                value={formatCurrency(summary.averageAssetValue)}
+                color="blue"
+              />
+              <SummaryCard
+                icon={<CheckCircle size={18} />}
+                label="Deployed"
+                value={summary.byStatus['Deployed']?.count || 0}
+                color="emerald"
+              />
+              <SummaryCard
+                icon={<AlertCircle size={18} />}
+                label="Available"
+                value={summary.byStatus['Available']?.count || 0}
+                color="orange"
+              />
+              <SummaryCard
+                icon={<Calendar size={18} />}
+                label={`Purchased ${new Date().getFullYear()}`}
+                value={summary.currentYearPurchases.count}
+                color="purple"
+                subtitle={formatCurrency(summary.currentYearPurchases.value)}
+              />
+            </div>
+
+            {/* Category & Department Breakdown */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  <PieChart size={16} /> Value by Category
+                </h3>
+                <div className="space-y-3">
+                  {Object.entries(summary.byCategory)
+                    .sort((a, b) => b[1].value - a[1].value)
+                    .slice(0, 8)
+                    .map(([category, stats]) => (
+                      <div key={category} className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-bold uppercase text-slate-700 dark:text-slate-300">{category}</span>
+                          <span className="font-mono font-bold text-slate-900 dark:text-white">
+                            {formatCurrency(stats.value)}
+                          </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                            style={{ width: `${(stats.value / summary.totalValue) * 100}%` }}
+                          />
+                        </div>
+                        <div className="text-[9px] text-slate-500">{stats.count} assets</div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#0f121d]">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  <Users size={16} /> Value by Department
+                </h3>
+                <div className="space-y-3">
+                  {Object.entries(summary.byDepartment)
+                    .sort((a, b) => b[1].value - a[1].value)
+                    .slice(0, 8)
+                    .map(([dept, stats]) => (
+                      <div key={dept} className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-bold uppercase text-slate-700 dark:text-slate-300">{dept}</span>
+                          <span className="font-mono font-bold text-slate-900 dark:text-white">
+                            {formatCurrency(stats.value)}
+                          </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                          <div
+                            className="h-full bg-gradient-to-r from-emerald-500 to-teal-500"
+                            style={{ width: `${(stats.value / summary.totalValue) * 100}%` }}
+                          />
+                        </div>
+                        <div className="text-[9px] text-slate-500">{stats.count} assets</div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ASSETS VIEW */}
+        {!loading && !error && viewMode === 'assets' && filteredData.length > 0 && (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-[#0f121d] dark:shadow-2xl">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-100 text-[8px] font-black uppercase tracking-widest text-slate-600 dark:border-slate-800 dark:bg-[#161b22] dark:text-slate-500">
+                  <th className="px-4 py-3">Tag</th>
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Value</th>
+                  <th className="px-4 py-3">Purchase Date</th>
+                  <th className="px-4 py-3 text-center">Age</th>
+                  <th className="px-4 py-3">Assigned To</th>
+                  <th className="px-4 py-3">Department</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800/30">
+                {filteredData.map((asset) => (
+                  <tr key={asset.id} className="text-[10px] hover:bg-slate-50 dark:hover:bg-white/2">
+                    <td className="px-4 py-4 font-mono font-bold text-cyan-700 dark:text-cyan-400">{asset.tag}</td>
+                    <td className="px-4 py-4 font-bold text-slate-900 dark:text-white">{asset.name}</td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{asset.category}</td>
+                    <td className="px-4 py-4">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[8px] font-black uppercase dark:bg-white/10">
+                        {asset.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-right font-mono font-bold text-slate-900 dark:text-white">
+                      {formatCurrency(asset.unitCost)}
+                    </td>
+                    <td className="px-4 py-4 font-mono text-[10px] text-slate-600 dark:text-slate-400">
+                      {formatDate(asset.purchaseDate)}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      {asset.ageInYears !== null ? (
+                        <span className="font-mono text-slate-600 dark:text-slate-400">{asset.ageInYears}y</span>
+                      ) : (
+                        <span className="text-slate-400">N/A</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
+                      {asset.assignedTo || <span className="text-slate-400">Unassigned</span>}
+                    </td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
+                      {asset.department || <span className="text-slate-400">Unassigned</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Empty States */}
+        {!loading && !error && filteredData.length === 0 && viewMode !== 'overview' && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Package size={48} className="mb-4 text-slate-300 dark:text-slate-600" />
+            <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+              {hasActiveFilters ? 'No assets match your filters' : 'No assets found'}
+            </p>
+            {hasActiveFilters && (
+              <button
+                onClick={handleClearFilters}
+                className="mt-2 text-[10px] font-black uppercase tracking-wider text-red-500 hover:text-red-400"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

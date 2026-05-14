@@ -20,6 +20,7 @@ import {
   Sun,
   Moon,
   BarChart3,
+  Building2,
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { AuditProvider } from './context/AuditContext';
@@ -47,6 +48,7 @@ import AuditLog from './pages/AuditLog';
 import Requests from './pages/Requests';
 import Profile from './pages/Profile';
 import Reports from './pages/Reports';
+import Suppliers from './pages/Suppliers';
 
 
 function AppContent() {
@@ -118,6 +120,7 @@ function AppContent() {
     { id: 'requests', label: 'Requests', icon: Send, path: '/requests', show: true },
     { id: 'audit', label: 'Audit Logs', icon: History, path: '/audit-history', show: canAccessAuditLog() },
     { id: 'reports', label: 'Reports', icon: BarChart3, path: '/reports', show: canAccessAuditLog() },
+    { id: 'suppliers', label: 'Suppliers', icon: Building2, path: '/suppliers', show: canAccessAssets() },
   ].filter((item) => item.show);
 
   return (
@@ -301,6 +304,7 @@ function AppContent() {
               <Route path="/requests" element={<Requests />} />
               {canAccessAuditLog() && <Route path="/audit-history" element={<AuditLog />} />}
               {canAccessAuditLog() && <Route path="/reports" element={<Reports />} />}
+              {canAccessAssets() && <Route path="/suppliers" element={<Suppliers />} />}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>

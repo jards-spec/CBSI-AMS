@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { encryptString, decryptString } = require('./crypto-utils');
+const { encryptString, decryptString } = require('../crypto-utils');
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@libsql/client');
@@ -12,7 +12,7 @@ const {
   sendEmailVerificationEmail,
   sendPasswordResetEmail,
   isMailerConfigured,
-} = require('./mailer');
+} = require('../mailer');
 
 const app = express();
 

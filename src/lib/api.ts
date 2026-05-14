@@ -3,10 +3,19 @@
  * Centralized API helper.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+/**
+ * src/lib/api.ts
+ * Centralized API helper.
+ */
+
+// ... rest of file
+
 const BASE =
   import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:5000/api';
+  '/api';  
 
 const TOKEN_KEY = 'vantage_token';
 const USER_KEY = 'vantage_user';
@@ -147,6 +156,8 @@ export const api = {
   },
 
   employees: createArchivableResource('employees'),
+
+  suppliers: createArchivableResource('suppliers'),
 
   consumables: {
     ...createArchivableResource('consumables'),

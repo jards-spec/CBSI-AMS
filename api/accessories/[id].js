@@ -1,0 +1,143 @@
+import { createClient } from '@libsql/client';
+
+const nowIso = () => new Date().toISOString();
+const requireNonEmptyString = (value, label) => {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) throw new Error(`${label} is required.`);
+  return normalized;
+};
+const requireNonNegativeNumber = (value, label) => {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) throw new Error(`${label} must be 0 or greater.`);
+  return num;
+};
+const getRequiredRow = async (db, table, id, label = 'Record') => {
+  const result = await db.execute({ 
+    sql: `SELECT * FROM ${table} WHERE id = ?`, 
+    args: [String(id)] 
+  });
+  const row = result.rows[0];
+  if (!row) throw new Error(`${label} not found`);
+  return row;
+};
+
+export default async function handler(req, res) {
+  const { id } = req.query;
+
+  if (!id) {
+    return res.status(400).json({ error: 'Accessory ID is required' });
+  }
+
+  const db = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
+
+  const queryOne = async (sql, args = []) => {
+    const result = await db.execute({ sql, args });
+    return result.rows[0] || null;
+  };
+
+  const run = async (sql, args = []) => {
+    return await db.execute({ sql, args });
+  };
+
+  // GET - Get single accessory
+  if (req.method === 'GET') {
+    try {
+      const accessory = await queryOne('SELECT * FROM Accessory WHERE id = ?', [String(id)]);
+      if (!accessory) {
+        return res.status(404).json({ error: 'Accessory not found' });
+      }
+      return res.status(200).json(accessory);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  // PUT - Update accessory
+  if (req.method === 'PUT') {
+    try {
+      await getRequiredRow(db, 'Accessory', id, 'Accessory');
+
+      const name = requireNonEmptyString(req.body.name, 'Accessory name');
+      const total = requireNonNegativeNumber(req.body.total ?? 0, 'Total');
+      const checkedOut = requireNonNegativeNumber(req.body.checkedOut ?? 0, 'Checked out');
+      
+      if (checkedOut > total) {
+        return res.status(400).json({ error: 'Checked out cannot exceed total.' });
+      }
+
+      await run(
+        `
+        UPDATE Accessory
+        SET name = ?, category = ?, modelNo = ?, location = ?, minQty = ?, total = ?, checkedOut = ?
+        WHERE id = ?
+        `,
+        [
+          name,
+          req.body.category || '',
+          req.body.modelNo || '',
+          req.body.location || '',
+          Number(req.body.minQty || 0),
+          total,
+          checkedOut,
+          String(id),
+        ],
+      );
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  // PATCH - Archive/Restore
+  if (req.method === 'PATCH') {
+    try {
+      const { action } = req.body;
+      
+      if (action === 'archive') {
+        await run(
+          `
+          UPDATE Accessory
+          SET isArchived = 1, archivedAt = ?, archivedById = ?, archivedByName = ?
+          WHERE id = ?
+          `,
+          [nowIso(), req.body.archivedById || '', req.body.archivedByName || '', String(id)],
+        );
+      } else if (action === 'restore') {
+        await run(
+          `
+          UPDATE Accessory
+          SET isArchived = 0, archivedAt = NULL, archivedById = NULL, archivedByName = NULL
+          WHERE id = ?
+          `,
+          [String(id)],
+        );
+      }
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  // DELETE - Delete accessory
+  if (req.method === 'DELETE') {
+    try {
+      const existing = await queryOne('SELECT name FROM Accessory WHERE id = ?', [String(id)]);
+      if (!existing) {
+        return res.status(404).json({ error: 'Accessory not found' });
+      }
+
+      await run('DELETE FROM Accessory WHERE id = ?', [String(id)]);
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}

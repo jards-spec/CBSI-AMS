@@ -95,3 +95,30 @@ Version 4.0.0 | May 2026
    - Select your repository
 
 3. **Configure Environment Variables**
+
+NODE_ENV=production
+PORT=5000
+TURSO_DATABASE_URL=libsql://your-db.turso.io
+TURSO_AUTH_TOKEN=your-auth-token
+JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+FRONTEND_PUBLIC_URL=https://your-domain.vercel.app
+
+
+4. **Deploy**
+- Railway will auto-detect Node.js
+- Click "Deploy"
+- Wait for deployment to complete
+- Copy your Railway URL (e.g., `https://your-app.railway.app`)
+
+### Step 2: Deploy Frontend to Vercel
+
+1. **Create Vercel Account**
+- Go to https://vercel.com
+- Sign up with GitHub
+
+2. **Import Project**
+- Click "Add New Project"
+- Import your GitHub repository
+- Select `asset-flow` as root directory
+
+3. **Configure Environment Variables**
