@@ -28,14 +28,15 @@ export interface AuditLog {
   details?: string;
 }
 
-interface AuditContextType {
+export interface AuditContextType {
   logs: AuditLog[];
   addLog: (type: LogType, entity: string, message: string, details?: string) => void;
   clearLogs: () => void;
   refreshLogs: () => Promise<void>;
 }
 
-const AuditContext = createContext<AuditContextType | undefined>(undefined);
+// ✅ ADD 'export' HERE (line 38)
+export const AuditContext = createContext<AuditContextType | undefined>(undefined);
 
 export const AuditProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
