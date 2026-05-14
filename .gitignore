@@ -54,3 +54,5 @@ Thumbs.db
 # Testing
 coverage/
 .vercel
+api/
+ams-backend/
