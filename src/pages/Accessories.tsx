@@ -1,15 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Edit2, Copy, Archive, RotateCcw } from 'lucide-react';
 import AccessoryModal from '../components/AccessoryModal';
 import TransactionModal from '../components/TransactionModal';
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 type Scope = 'active' | 'archived' | 'all';
 
 const Accessories = () => {
-  const { currentUser } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser } = useAuth();
 
   const [scope, setScope] = useState<Scope>('active');
   const [items, setItems] = useState<any[]>([]);
@@ -93,8 +96,14 @@ const Accessories = () => {
   };
 
   const handleArchive = async (item: any) => {
-    if (!window.confirm(`Archive ${item.name}?`)) return;
-
+const ok = await confirmDialog({
+  title: 'Archive Accessory',
+  message: `Archive ${item.name}?`,
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
     try {
       await api.accessories.archive(item.id, {
         archivedById: currentUser?.id,
@@ -407,3 +416,4 @@ const Accessories = () => {
 };
 
 export default Accessories;
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -20,6 +20,7 @@ import LicenseModal from '../components/LicenseModal';
 import TransactionModal from '../components/TransactionModal';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 type Scope = 'active' | 'archived' | 'all';
 
@@ -42,7 +43,9 @@ type Assignee = {
 };
 
 const SoftwareLicenses = () => {
-  const { currentUser } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLicense, setEditingLicense] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,7 +130,9 @@ const SoftwareLicenses = () => {
   };
 
   const handleKeyClick = (license: any) => {
-    const isVisible = !!showKeys[license.id];
+    
+  const confirmDialog = useConfirm();
+const isVisible = !!showKeys[license.id];
 
     if (isVisible) {
       setShowKeys((current) => ({ ...current, [license.id]: false }));
@@ -194,7 +199,14 @@ const SoftwareLicenses = () => {
   };
 
   const handleArchive = async (license: any) => {
-    if (!window.confirm(`Archive ${license.name}?`)) return;
+    const ok = await confirmDialog({
+  title: 'Archive License',
+  message: `Archive ${license.name}?`,
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
     try {
       await api.licenses.archive(license.id, {
         archivedById: currentUser?.id,
@@ -238,7 +250,9 @@ const SoftwareLicenses = () => {
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
+    
+  const confirmDialog = useConfirm();
+if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -361,7 +375,7 @@ const SoftwareLicenses = () => {
 
                 <div className="mb-4 flex items-center gap-2">
                   <code className="rounded bg-slate-100 px-2 py-1 text-[10px] font-mono text-slate-600 dark:bg-black/20 dark:text-slate-400">
-                    {showKeys[license.id] ? (revealedKeys[license.id] || '••••-••••-••••') : '••••-••••-••••'}
+                    {showKeys[license.id] ? (revealedKeys[license.id] || 'â€¢â€¢â€¢â€¢-â€¢â€¢â€¢â€¢-â€¢â€¢â€¢â€¢') : 'â€¢â€¢â€¢â€¢-â€¢â€¢â€¢â€¢-â€¢â€¢â€¢â€¢'}
                   </code>
                   <button
                     onClick={() => handleKeyClick(license)}
@@ -512,7 +526,7 @@ const SoftwareLicenses = () => {
                     <td className="px-5 py-5">
                       <div className="flex items-center gap-2">
                         <code className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-mono tracking-tight text-slate-600 dark:bg-black/20 dark:text-slate-400">
-                          {showKeys[license.id] ? (revealedKeys[license.id] || '••••-••••-••••') : '••••-••••-••••'}
+                          {showKeys[license.id] ? (revealedKeys[license.id] || 'â€¢â€¢â€¢â€¢-â€¢â€¢â€¢â€¢-â€¢â€¢â€¢â€¢') : 'â€¢â€¢â€¢â€¢-â€¢â€¢â€¢â€¢-â€¢â€¢â€¢â€¢'}
                         </code>
                         <button
                           onClick={() => handleKeyClick(license)}
@@ -821,7 +835,7 @@ const SoftwareLicenses = () => {
                                 <span className="font-mono text-[10px]">{formatDate(assignee.returnedAt)}</span>
                               </div>
                             ) : (
-                              <span className="text-[10px] text-slate-600">—</span>
+                              <span className="text-[10px] text-slate-600">â€”</span>
                             )}
                           </td>
                         </tr>
@@ -848,3 +862,4 @@ const SoftwareLicenses = () => {
 };
 
 export default SoftwareLicenses;
+

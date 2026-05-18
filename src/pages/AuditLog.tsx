@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   Search,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
+import { useConfirm } from '../context/ConfirmContext';
 
 type LogType =
   | 'ADDED'
@@ -196,12 +197,38 @@ const PRINT_STYLE = `
 
 const getLogDate = (log: AuditLogItem) => {
   const raw = log.createdAt || log.timestamp;
-  const parsed = new Date(raw);
+  if (!raw) return null;
+
+  const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const parsed = new Date(normalized);
+
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+const formatLogTimestamp = (log: AuditLogItem) => {
+  const raw = log.createdAt || log.timestamp;
+  if (!raw) return '-';
+
+  const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const parsed = new Date(normalized);
+
+  if (Number.isNaN(parsed.getTime())) return raw;
+
+  return parsed.toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+};
+
 export default function AuditLog() {
-  const [logs, setLogs] = useState<AuditLogItem[]>([]);
+  
+  const confirmDialog = useConfirm();
+const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeType, setActiveType] = useState('ALL');
@@ -236,7 +263,14 @@ export default function AuditLog() {
   }, []);
 
   const handleClear = async () => {
-    if (!window.confirm('Permanently wipe all audit logs? This cannot be undone.')) return;
+    const ok = await confirmDialog({
+  title: 'Wipe Audit Logs',
+  message: 'Permanently wipe all audit logs? This cannot be undone.',
+  confirmText: 'Wipe',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
     try {
       await api.audit.clear();
       await refresh();
@@ -305,7 +339,7 @@ export default function AuditLog() {
     activeType !== 'ALL' ? `Category: ${activeType}` : 'All Categories',
     `Sort: ${sortOrder === 'newest' ? 'Latest First' : 'Oldest First'}`,
     `Entries: ${filteredLogs.length}`,
-  ].join('  •  ');
+  ].join('  â€¢  ');
 
   const escapeHtml = (value: string) =>
   String(value)
@@ -320,7 +354,7 @@ const buildPrintHtml = () => {
     .map(
       (log) => `
       <tr>
-        <td>${escapeHtml(log.timestamp || '')}</td>
+        <td>${escapeHtml(formatLogTimestamp(log))}</td>
         <td>${escapeHtml(log.type || '')}</td>
         <td>${escapeHtml(log.entity || '-')}</td>
         <td>${escapeHtml(log.message || '-')}</td>
@@ -595,7 +629,7 @@ const buildPrintHtml = () => {
     <tbody>
       {filteredLogs.map((log) => (
         <tr key={log.id}>
-          <td className="border border-slate-300 px-2 py-1">{log.timestamp}</td>
+          <td className="border border-slate-300 px-2 py-1">{formatLogTimestamp(log)}</td>
           <td className="border border-slate-300 px-2 py-1">{log.type}</td>
           <td className="border border-slate-300 px-2 py-1">{log.entity || '-'}</td>
           <td className="border border-slate-300 px-2 py-1">{log.message || '-'}</td>
@@ -711,7 +745,7 @@ const buildPrintHtml = () => {
                         <td className="whitespace-nowrap px-8 py-4">
                           <div className="flex items-center gap-3 font-mono text-[10px] font-bold text-slate-600 dark:text-slate-400">
                             <Clock size={12} className="shrink-0 text-red-600/60 transition-colors group-hover:text-red-600" />
-                            {log.timestamp}
+                            {formatLogTimestamp(log)}
                           </div>
                         </td>
 
@@ -730,7 +764,7 @@ const buildPrintHtml = () => {
                           <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-700 dark:text-slate-300">
                             <Tag size={11} className="shrink-0 text-red-600/40" />
                             <span className="rounded border border-slate-200 bg-slate-100 px-2 py-0.5 dark:border-slate-800/50 dark:bg-slate-900/50">
-                              {log.entity || '—'}
+                              {log.entity || 'â€”'}
                             </span>
                           </div>
                         </td>
@@ -738,7 +772,7 @@ const buildPrintHtml = () => {
                         <td className="max-w-xs px-8 py-4 xl:max-w-md">
                           <div className="flex items-center gap-3 text-[10px] font-bold uppercase italic tracking-tight text-slate-600 dark:text-slate-400">
                             <FileText size={12} className="shrink-0 text-slate-500 transition-colors group-hover:text-red-600/50 dark:text-slate-700" />
-                            <span className="truncate">{log.message || '—'}</span>
+                            <span className="truncate">{log.message || 'â€”'}</span>
                           </div>
                         </td>
                       </tr>
@@ -752,7 +786,7 @@ const buildPrintHtml = () => {
 
         <div className="mt-10 hidden border-t-2 border-slate-900 pt-5 text-center print:block">
           <p className="text-[9px] font-bold uppercase tracking-[0.35em] text-slate-500">
-            CentralBooks Vantage Asset Management System — Confidential Report
+            CentralBooks Vantage Asset Management System â€” Confidential Report
           </p>
         </div>
       </div>

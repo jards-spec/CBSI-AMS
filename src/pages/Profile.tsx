@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Mail,
   Hash,
@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
+import { useConfirm } from '../context/ConfirmContext';
 
 const roleBadgeStyles: Record<string, string> = {
   Admin: 'border-red-600/40 bg-red-600/10 text-red-500',
@@ -49,7 +50,9 @@ const emptyProfileForm: ProfileFormState = {
 };
 
 const Profile = () => {
-  const { currentUser, updateCurrentUser } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser, updateCurrentUser } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -147,7 +150,9 @@ const Profile = () => {
   }, [submittedTickets]);
 
   const openEdit = () => {
-    setErrorMessage('');
+    
+  const confirmDialog = useConfirm();
+setErrorMessage('');
     setFormData({
       name: employeeRecord?.name || currentUser?.name || '',
       email: employeeRecord?.email || currentUser?.email || '',
@@ -163,7 +168,9 @@ const Profile = () => {
   };
 
   const handleAvatarUpload = (file: File) => {
-    const reader = new FileReader();
+    
+  const confirmDialog = useConfirm();
+const reader = new FileReader();
     reader.onload = () => {
       setFormData((prev) => ({
         ...prev,
@@ -192,9 +199,13 @@ const Profile = () => {
         payload.password = formData.password;
       }
 
-      const confirmed = window.confirm(
-        `Confirm profile changes?\n\nName: ${payload.name}\nEmail: ${payload.email}\nPhone: ${payload.phone || 'Not provided'}`
-      );
+      const confirmed = await confirmDialog({
+  title: 'Confirm Action',
+  message: 'Are you sure you want to continue?',
+  confirmText: 'Confirm',
+  cancelText: 'Cancel',
+  danger: true,
+});
 
       if (!confirmed) {
         setSaving(false);
@@ -227,7 +238,9 @@ const Profile = () => {
   };
 
   const requestStatusStyle = (status: string) => {
-    switch (status) {
+    
+  const confirmDialog = useConfirm();
+switch (status) {
       case 'Approved':
         return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
       case 'Rejected':
@@ -238,7 +251,9 @@ const Profile = () => {
   };
 
   const ticketStatusStyle = (status: string) => {
-    switch (status) {
+    
+  const confirmDialog = useConfirm();
+switch (status) {
       case 'Resolved':
         return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
       case 'Closed':
@@ -323,9 +338,9 @@ const Profile = () => {
               </h3>
 
               <div className="space-y-4">
-                <InfoRow icon={<Hash size={16} className="text-red-600" />} label="Employee Number" value={employeeRecord?.employeeNumber || currentUser.employeeNumber || '—'} />
-                <InfoRow icon={<Mail size={16} className="text-red-600" />} label="Email" value={employeeRecord?.email || currentUser.email || '—'} />
-                <InfoRow icon={<Building2 size={16} className="text-red-600" />} label="Department" value={employeeRecord?.department || currentUser.department || '—'} />
+                <InfoRow icon={<Hash size={16} className="text-red-600" />} label="Employee Number" value={employeeRecord?.employeeNumber || currentUser.employeeNumber || 'â€”'} />
+                <InfoRow icon={<Mail size={16} className="text-red-600" />} label="Email" value={employeeRecord?.email || currentUser.email || 'â€”'} />
+                <InfoRow icon={<Building2 size={16} className="text-red-600" />} label="Department" value={employeeRecord?.department || currentUser.department || 'â€”'} />
                 <InfoRow icon={<Phone size={16} className="text-red-600" />} label="Phone" value={employeeRecord?.phone || currentUser.phone || 'Not provided'} />
                 <InfoRow icon={<Briefcase size={16} className="text-red-600" />} label="Job Title" value={employeeRecord?.jobTitle || currentUser.jobTitle || 'Not provided'} />
               </div>
@@ -353,7 +368,7 @@ const Profile = () => {
                             {asset.name}
                           </p>
                           <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                            {asset.tag} {asset.manufacturer ? `• ${asset.manufacturer}` : ''}
+                            {asset.tag} {asset.manufacturer ? `â€¢ ${asset.manufacturer}` : ''}
                           </p>
                         </div>
                         <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-blue-500">
@@ -416,7 +431,7 @@ const Profile = () => {
                             {ticket.title}
                           </p>
                           <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                            {ticket.category} • {new Date(ticket.submittedAt).toLocaleDateString()}
+                            {ticket.category} â€¢ {new Date(ticket.submittedAt).toLocaleDateString()}
                           </p>
                         </div>
                         <span
@@ -526,12 +541,12 @@ const Profile = () => {
                   </div>
 
                   <div className="grid gap-5 md:grid-cols-2">
-                    <ReadOnlyField label="Employee Number" value={formData.employeeNumber || '—'} />
-                    <ReadOnlyField label="Department" value={formData.department || '—'} />
+                    <ReadOnlyField label="Employee Number" value={formData.employeeNumber || 'â€”'} />
+                    <ReadOnlyField label="Department" value={formData.department || 'â€”'} />
                   </div>
 
                   <div className="grid gap-5 md:grid-cols-2">
-                    <ReadOnlyField label="Access Level" value={formData.role || '—'} />
+                    <ReadOnlyField label="Access Level" value={formData.role || 'â€”'} />
                     <ProfileField
                       label="Phone"
                       value={formData.phone}
@@ -703,3 +718,4 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
 }
 
 export default Profile;
+

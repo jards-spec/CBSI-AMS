@@ -1,13 +1,16 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { 
   History, Search, Filter, Download, 
   Trash2, Calendar, User, Tag, RotateCcw
 } from 'lucide-react';
 import { useAudit } from '../context/AuditContext';
 import { cn } from '../lib/utils';
+import { useConfirm } from '../context/ConfirmContext';
 
 const AuditHistory = () => {
-  const { logs, clearLogs } = useAudit();
+  
+  const confirmDialog = useConfirm();
+const { logs, clearLogs } = useAudit();
   
   // Filter States
   const [search, setSearch] = useState('');
@@ -45,7 +48,9 @@ const AuditHistory = () => {
   const actionTypes = ['ALL', ...Array.from(new Set(logs.map(l => l.action)))];
 
   const handleExport = () => {
-    const data = JSON.stringify(logs, null, 2);
+    
+  const confirmDialog = useConfirm();
+const data = JSON.stringify(logs, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -55,7 +60,9 @@ const AuditHistory = () => {
   };
 
   const resetFilters = () => {
-    setSearch('');
+    
+  const confirmDialog = useConfirm();
+setSearch('');
     setFilterAction('ALL');
     setStartDate('');
     setEndDate('');
@@ -78,7 +85,16 @@ const AuditHistory = () => {
             <Download size={14} /> Export
           </button>
           <button 
-            onClick={() => { if(confirm('Clear all logs?')) clearLogs(); }}
+            onClick={async () => {
+  const ok = await confirmDialog({
+    title: 'Clear Logs',
+    message: 'Clear all logs?',
+    confirmText: 'Clear',
+    cancelText: 'Cancel',
+    danger: true,
+  });
+  if (ok) await clearLogs();
+}}
             className="px-4 py-2 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
           >
             <Trash2 size={14} /> Purge
@@ -217,3 +233,4 @@ const AuditHistory = () => {
 };
 
 export default AuditHistory;
+

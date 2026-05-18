@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Send,
   Search,
@@ -25,6 +25,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import PrintableRequest from '../components/PrintableRequest';
+import { useConfirm } from '../context/ConfirmContext';
 
 const DEPT_MANAGER_MAP: Record<string, string> = {
   'Editorial Department': 'Bryan Defita',
@@ -88,7 +89,9 @@ const createDefaultItem = (): RequestItem => ({
 });
 
 const Requests = () => {
-  const { currentUser, canViewAll } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser, canViewAll } = useAuth();
   const canManageRequests = canViewAll();
 
   const [loading, setLoading] = useState(true);
@@ -185,15 +188,21 @@ const Requests = () => {
   );
 
   const addItem = () => {
-    setItems((current) => [...current, createDefaultItem()]);
+    
+  const confirmDialog = useConfirm();
+setItems((current) => [...current, createDefaultItem()]);
   };
 
   const removeItem = (id: number) => {
-    setItems((current) => (current.length > 1 ? current.filter((item) => item.id !== id) : current));
+    
+  const confirmDialog = useConfirm();
+setItems((current) => (current.length > 1 ? current.filter((item) => item.id !== id) : current));
   };
 
   const updateItem = (id: number, field: keyof RequestItem, value: string | number) => {
-    setItems((current) =>
+    
+  const confirmDialog = useConfirm();
+setItems((current) =>
       current.map((item) => {
         if (item.id !== id) return item;
 
@@ -218,7 +227,9 @@ const Requests = () => {
   };
 
   const handleDepartmentChange = (department: string) => {
-    setRequestor((current) => ({
+    
+  const confirmDialog = useConfirm();
+setRequestor((current) => ({
       ...current,
       department,
       manager: DEPT_MANAGER_MAP[department] || '',
@@ -277,7 +288,14 @@ const Requests = () => {
   };
 
   const handleArchiveRequest = async (request: any) => {
-    if (!window.confirm(`Archive ${request.requestNumber}?`)) return;
+    const ok = await confirmDialog({
+  title: 'Archive Request',
+  message: `Archive ${request.requestNumber}?`,
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
     try {
       await api.requests.archive(request.id, {
         archivedById: currentUser?.id,
@@ -302,7 +320,9 @@ const Requests = () => {
   };
 
   const openPrintPreview = (request: any) => {
-    const selectedExec = approvingExecs[request.id] || EXECUTIVES[0];
+    
+  const confirmDialog = useConfirm();
+const selectedExec = approvingExecs[request.id] || EXECUTIVES[0];
     setActivePrintRequest({ ...request, approvingExecutive: selectedExec });
   };
 
@@ -393,7 +413,7 @@ const Requests = () => {
                 <User size={12} /> Full Name
               </label>
               <div className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-[#050505] dark:text-slate-400">
-                {requestor.name || '—'}
+                {requestor.name || 'â€”'}
               </div>
             </div>
 
@@ -783,3 +803,4 @@ const Requests = () => {
 };
 
 export default Requests;
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -18,6 +18,7 @@ import {
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 type Scope = 'active' | 'archived' | 'all';
 
@@ -36,7 +37,9 @@ interface Supplier {
 }
 
 const Suppliers = () => {
-  const { currentUser } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,7 +85,14 @@ const Suppliers = () => {
   };
 
   const handleArchive = async (supplier: Supplier) => {
-    if (!window.confirm(`Archive ${supplier.name}?`)) return;
+    const ok = await confirmDialog({
+  title: 'Archive Supplier',
+  message: `Archive ${supplier.name}?`,
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
     try {
       await api.suppliers.archive(supplier.id, {
         archivedById: currentUser?.id,
@@ -435,7 +445,9 @@ const SupplierModal = ({ supplier, onClose, onSave }: { supplier: Supplier | nul
   });
 
   const handleSubmit = (e: React.SyntheticEvent) => {
-    e.preventDefault();
+    
+  const confirmDialog = useConfirm();
+e.preventDefault();
     onSave(formData);
   };
 
@@ -576,3 +588,4 @@ const SupplierModal = ({ supplier, onClose, onSave }: { supplier: Supplier | nul
 };
 
 export default Suppliers;
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Plus,
@@ -23,11 +23,14 @@ import EmployeeModal from '../components/EmployeeModal';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
+import { useConfirm } from '../context/ConfirmContext';
 
 type Scope = 'active' | 'archived' | 'all';
 
 const Employees = () => {
-  const { currentUser, logout, canCreate, canEdit, canDelete, canViewAll } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser, logout, canCreate, canEdit, canDelete, canViewAll } = useAuth();
   const [scope, setScope] = useState<Scope>('active');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -104,7 +107,14 @@ const Employees = () => {
       return;
     }
 
-    if (!window.confirm(`Archive ${employee.name}?`)) return;
+    const ok = await confirmDialog({
+  title: 'Archive Employee',
+  message: `Archive ${employee.name}?`,
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
 
     try {
       await api.employees.archive(employee.id, {
@@ -135,7 +145,9 @@ const Employees = () => {
   };
 
   const getRoleIcon = (role: string) => {
-    switch (role) {
+    
+  const confirmDialog = useConfirm();
+switch (role) {
       case 'Admin':
         return <Crown size={14} className="text-red-600" />;
       case 'Superuser':
@@ -148,7 +160,9 @@ const Employees = () => {
   };
 
   const getRoleBadgeColor = (role: string) => {
-    switch (role) {
+    
+  const confirmDialog = useConfirm();
+switch (role) {
       case 'Admin':
         return 'border-red-600/50 bg-red-600/10 text-red-500';
       case 'Superuser':
@@ -187,7 +201,7 @@ const Employees = () => {
               <span>{currentUser?.department}</span>
               {currentUser?.employeeNumber ? (
                 <>
-                  <span>•</span>
+                  <span>â€¢</span>
                   <span>{currentUser.employeeNumber}</span>
                 </>
               ) : null}
@@ -453,3 +467,4 @@ const Employees = () => {
 };
 
 export default Employees;
+

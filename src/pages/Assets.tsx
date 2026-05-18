@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -18,6 +18,7 @@ import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { formatPHP } from '../lib/currency';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 interface AssetRecord {
   id: string;
@@ -44,7 +45,9 @@ interface AssetRecord {
 type Scope = 'active' | 'archived' | 'all';
 
 const Assets = () => {
-  const { currentUser } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser } = useAuth();
 
   const [scope, setScope] = useState<Scope>('active');
   const [searchQuery, setSearchQuery] = useState('');
@@ -91,7 +94,9 @@ const Assets = () => {
   }, [assets, searchQuery]);
 
   const getStatusStyles = (status: string) => {
-    switch ((status || '').toLowerCase()) {
+    
+  const confirmDialog = useConfirm();
+switch ((status || '').toLowerCase()) {
       case 'deployed':
         return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
       case 'maintenance':
@@ -105,7 +110,9 @@ const Assets = () => {
   };
 
   const generateAssetTag = (category: string) => {
-    const prefix =
+    
+  const confirmDialog = useConfirm();
+const prefix =
       (category || 'AST').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'AST';
 
     const highest = assets.reduce((max, asset) => {
@@ -193,8 +200,14 @@ const Assets = () => {
   };
 
   const handleArchiveAsset = async (asset: AssetRecord) => {
-    if (!window.confirm(`Archive ${asset.name}?`)) return;
-
+const ok = await confirmDialog({
+  title: 'Archive Asset',
+  message: `Archive ${asset.name}?`,
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
     try {
       await api.assets.archive(asset.id, {
         archivedById: currentUser?.id,
@@ -485,7 +498,7 @@ const Assets = () => {
                                       </div>
                                       <div className="mt-1 text-[9px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-600">
                                         {component.category || 'Component'}{' '}
-                                        {component.model ? `• ${component.model}` : ''}
+                                        {component.model ? `â€¢ ${component.model}` : ''}
                                       </div>
                                       <div className="mt-1 text-[9px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-600">
                                         Qty: {component.quantity}
@@ -520,7 +533,7 @@ const Assets = () => {
                                       </div>
                                       <div className="mt-1 text-[9px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-600">
                                         {accessory.category || 'Accessory'}{' '}
-                                        {accessory.modelNo ? `• ${accessory.modelNo}` : ''}
+                                        {accessory.modelNo ? `â€¢ ${accessory.modelNo}` : ''}
                                       </div>
                                       <div className="mt-1 text-[9px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-600">
                                         Qty: {accessory.quantity}
@@ -588,3 +601,4 @@ const Assets = () => {
 };
 
 export default Assets;
+

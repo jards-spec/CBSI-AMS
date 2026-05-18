@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Wrench,
   Plus,
@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
+import { useConfirm } from '../context/ConfirmContext';
 
 interface Ticket {
   id: string;
@@ -46,7 +47,9 @@ const defaultForm = {
 };
 
 const Maintenance = () => {
-  const { currentUser, canViewAll } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser, canViewAll } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<Scope>('active');
@@ -101,7 +104,9 @@ const Maintenance = () => {
   }, [canViewAll, currentUser?.id, priorityFilter, searchQuery, statusFilter, tickets]);
 
   const resetForm = () => {
-    setEditingTicket(null);
+    
+  const confirmDialog = useConfirm();
+setEditingTicket(null);
     setFormData(defaultForm);
   };
 
@@ -133,7 +138,9 @@ const Maintenance = () => {
   };
 
   const handleEdit = (ticket: Ticket) => {
-    setEditingTicket(ticket);
+    
+  const confirmDialog = useConfirm();
+setEditingTicket(ticket);
     setFormData({
       title: ticket.title,
       description: ticket.description,
@@ -146,7 +153,14 @@ const Maintenance = () => {
   };
 
   const handleArchive = async (ticket: Ticket) => {
-    if (!window.confirm('Archive this ticket?')) return;
+    const ok = await confirmDialog({
+  title: 'Archive Ticket',
+  message: 'Archive this ticket?',
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
     try {
       await api.maintenance.archive(ticket.id, {
         archivedById: currentUser?.id,
@@ -183,7 +197,9 @@ const Maintenance = () => {
   };
 
   const getPriorityColor = (priority: string) => {
-    switch (priority) {
+    
+  const confirmDialog = useConfirm();
+switch (priority) {
       case 'Critical':
         return 'border-red-600/50 bg-red-600/10 text-red-600 dark:text-red-500';
       case 'High':
@@ -198,7 +214,9 @@ const Maintenance = () => {
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    
+  const confirmDialog = useConfirm();
+switch (status) {
       case 'Open':
         return <Clock size={16} className="text-blue-500" />;
       case 'In Progress':
@@ -505,7 +523,7 @@ const Maintenance = () => {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-500">
-                    Maintenance Cost (₱)
+                    Maintenance Cost (â‚±)
                   </label>
                   <input
                     type="number"
@@ -546,3 +564,4 @@ const Maintenance = () => {
 };
 
 export default Maintenance;
+

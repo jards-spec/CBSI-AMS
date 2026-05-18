@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Edit2, Copy, Archive, RotateCcw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ConsumableModal from '../components/ConsumableModal';
@@ -6,11 +6,14 @@ import TransactionModal from '../components/TransactionModal';
 import { api } from '../lib/api';
 import { formatPHP } from '../lib/currency';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 type Scope = 'active' | 'archived' | 'all';
 
 const Consumables = () => {
-  const { currentUser } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser } = useAuth();
 
   const [scope, setScope] = useState<Scope>('active');
   const [items, setItems] = useState<any[]>([]);
@@ -82,7 +85,14 @@ const Consumables = () => {
   };
 
   const handleArchive = async (item: any) => {
-    if (!window.confirm(`Archive ${item.name}?`)) return;
+    const ok = await confirmDialog({
+  title: 'Archive Consumable',
+  message: `Archive ${item.name}?`,
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
 
     try {
       await api.consumables.archive(item.id, {
@@ -417,3 +427,4 @@ const Consumables = () => {
 };
 
 export default Consumables;
+

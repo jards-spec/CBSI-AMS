@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -15,6 +15,7 @@ import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import TransactionModal from '../components/TransactionModal';
+import { useConfirm } from '../context/ConfirmContext';
 
 type Scope = 'active' | 'archived' | 'all';
 
@@ -28,7 +29,9 @@ const defaultForm = {
 };
 
 const Components = () => {
-  const { currentUser } = useAuth();
+  
+  const confirmDialog = useConfirm();
+const { currentUser } = useAuth();
 
   const [items, setItems] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
@@ -77,14 +80,18 @@ const Components = () => {
   };
 
   const openCreate = () => {
-    setEditingItem(null);
+    
+  const confirmDialog = useConfirm();
+setEditingItem(null);
     setIsCustomCategory(false);
     setFormData(defaultForm);
     setIsRegisterOpen(true);
   };
 
   const openEdit = (item: any) => {
-    setEditingItem(item);
+    
+  const confirmDialog = useConfirm();
+setEditingItem(item);
     setIsCustomCategory(
       ![
         'MEMORY (RAM)',
@@ -163,7 +170,14 @@ const Components = () => {
   };
 
   const handleArchive = async (item: any) => {
-    if (!window.confirm(`Archive ${item.name}?`)) return;
+    const ok = await confirmDialog({
+  title: 'Archive Component',
+  message: `Archive ${item.name}?`,
+  confirmText: 'Archive',
+  cancelText: 'Cancel',
+  danger: true,
+});
+if (!ok) return;
     try {
       await api.components.archive(item.id, {
         archivedById: currentUser?.id,
@@ -224,7 +238,9 @@ const Components = () => {
   };
 
   const getStatusStyle = (status: string) => {
-    switch (status?.toUpperCase()) {
+    
+  const confirmDialog = useConfirm();
+switch (status?.toUpperCase()) {
       case 'AVAILABLE':
         return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
       case 'DEPLOYED':
@@ -331,14 +347,14 @@ const Components = () => {
                       {item.name}
                     </div>
                     <div className="mt-1 text-[9px] uppercase text-slate-500 dark:text-slate-600">
-                      {item.location || '—'}
+                      {item.location || 'â€”'}
                     </div>
                   </td>
 
                   <td className="px-6 py-5 font-bold uppercase tracking-tighter text-slate-700 dark:text-slate-400">
                     <div>{item.category}</div>
                     <div className="mt-1 text-[9px] italic text-slate-500 dark:text-slate-600">
-                      {item.model || '—'}
+                      {item.model || 'â€”'}
                     </div>
                   </td>
 
@@ -647,3 +663,4 @@ const Components = () => {
 };
 
 export default Components;
+
