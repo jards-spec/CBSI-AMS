@@ -77,9 +77,41 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const method = (options.method || 'GET').toUpperCase();
+  const isEmployeePath = /^\/employees(\/|$)/.test(normalizedPath);
+  const isEmployeeMutation = isEmployeePath && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+
+  let outgoingBody = options.body;
+
+  if (isEmployeeMutation) {
+    let parsed: any = {};
+
+    if (typeof outgoingBody === 'string' && outgoingBody.length > 0) {
+      try {
+        parsed = JSON.parse(outgoingBody);
+      } catch {
+        parsed = {};
+      }
+    }
+
+    if (!parsed.adminPassword) {
+      const entered = window.prompt('Confirm your admin password to continue:');
+      if (!entered || !entered.trim()) {
+        throw new Error('Admin password is required.');
+      }
+      parsed.adminPassword = entered.trim();
+    }
+
+    outgoingBody = JSON.stringify(parsed);
+
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+  }
 
   const res = await fetch(`${BASE}${normalizedPath}`, {
     ...options,
+    body: outgoingBody,
     headers,
   });
 
@@ -87,13 +119,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const err = await res.json().catch(() => ({ error: res.statusText }));
 
     if (res.status === 401 && !isAuthPath(path)) {
-      const msg = String(err?.error || '').toLowerCase();
-      const isAdminReauthFailure =
-        msg.includes('admin password') ||
-        msg.includes('invalid admin password') ||
-        msg.includes('confirm your admin password');
-
-      if (!isAdminReauthFailure) {
+      // IMPORTANT: don't auto-logout for employee admin re-auth failures
+      if (!isEmployeePath) {
         handleUnauthorized();
       }
     }
@@ -326,6 +353,8 @@ suppliers: createArchivableResource('suppliers'),
       request<{ report: any[]; pending: any[]; confirmed: any[]; declined: any[]; summary: any }>('/reports/unconfirmed-assignments'),
   },
 };
+
+
 
 
 
