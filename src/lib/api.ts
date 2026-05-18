@@ -107,11 +107,20 @@ const createArchivableResource = (resource: string) => ({
 
 export const api = {
   auth: {
-    login: (data: { employeeNumber: string; password: string }) =>
-      request<{ success: boolean; token: string; user: any }>('/auth/login', {
+    login: async (data: { employeeNumber: string; password: string }) => {
+      const raw = await request<any>('/auth/login', {
         method: 'POST',
         body: JSON.stringify(data),
-      }),
+      });
+
+      return {
+        success: raw?.success ?? true,
+        token: raw?.token ?? raw?.accessToken ?? '',
+        user: raw?.user ?? raw?.employee ?? raw?.data?.user ?? raw?.data?.employee ?? null,
+        message: raw?.message,
+      };
+    },
+
     register: (data: {
       name: string;
       email: string;
@@ -126,24 +135,32 @@ export const api = {
           body: JSON.stringify(data),
         },
       ),
+
     forgotPassword: (data: { email?: string; employeeNumber?: string }) =>
       request<{ success: boolean; message: string }>('/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+
     resetPassword: (data: { token: string; password: string }) =>
       request<{ success: boolean; message: string }>('/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+
     verifyEmail: (token: string) =>
       request<{ success: boolean; message: string }>(`/auth/verify-email?token=${encodeURIComponent(token)}`),
+
     resendVerification: (data: { email?: string; employeeNumber?: string }) =>
       request<{ success: boolean; message: string }>('/auth/resend-verification', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
   },
+
+  // keep your assets/employees/... sections below unchanged
+
+  
 
   assets: {
     ...createArchivableResource('assets'),
