@@ -37,7 +37,6 @@ interface Supplier {
 }
 
 const Suppliers = () => {
-  
   const confirmDialog = useConfirm();
 const { currentUser } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -430,7 +429,7 @@ if (!ok) return;
   );
 };
 
-const SupplierModal = ({ supplier, onClose, onSave }: { supplier: Supplier | null; onClose: () => void; onSave: (data: any) => void }) => {
+const SupplierModal = ({ supplier, onClose, onSave }: { supplier: Supplier | null; onClose: () => void; onSave: (data: any) => Promise<void> }) => {
   const isEditing = !!supplier;
 
   const [formData, setFormData] = useState({
@@ -444,11 +443,9 @@ const SupplierModal = ({ supplier, onClose, onSave }: { supplier: Supplier | nul
     notes: supplier?.notes || '',
   });
 
-  const handleSubmit = (e: React.SyntheticEvent) => {
-    
-  const confirmDialog = useConfirm();
-e.preventDefault();
-    onSave(formData);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onSave(formData);
   };
 
   return (
@@ -588,6 +585,7 @@ e.preventDefault();
 };
 
 export default Suppliers;
+
 
 
 

@@ -89,7 +89,6 @@ const createDefaultItem = (): RequestItem => ({
 });
 
 const Requests = () => {
-  
   const confirmDialog = useConfirm();
 const { currentUser, canViewAll } = useAuth();
   const canManageRequests = canViewAll();
@@ -188,20 +187,17 @@ const { currentUser, canViewAll } = useAuth();
   );
 
   const addItem = () => {
-    
-  const confirmDialog = useConfirm();
+
 setItems((current) => [...current, createDefaultItem()]);
   };
 
   const removeItem = (id: number) => {
-    
-  const confirmDialog = useConfirm();
+
 setItems((current) => (current.length > 1 ? current.filter((item) => item.id !== id) : current));
   };
 
   const updateItem = (id: number, field: keyof RequestItem, value: string | number) => {
-    
-  const confirmDialog = useConfirm();
+
 setItems((current) =>
       current.map((item) => {
         if (item.id !== id) return item;
@@ -227,8 +223,7 @@ setItems((current) =>
   };
 
   const handleDepartmentChange = (department: string) => {
-    
-  const confirmDialog = useConfirm();
+
 setRequestor((current) => ({
       ...current,
       department,
@@ -320,8 +315,7 @@ if (!ok) return;
   };
 
   const openPrintPreview = (request: any) => {
-    
-  const confirmDialog = useConfirm();
+
 const selectedExec = approvingExecs[request.id] || EXECUTIVES[0];
     setActivePrintRequest({ ...request, approvingExecutive: selectedExec });
   };
@@ -803,6 +797,7 @@ const selectedExec = approvingExecs[request.id] || EXECUTIVES[0];
 };
 
 export default Requests;
+
 
 
 

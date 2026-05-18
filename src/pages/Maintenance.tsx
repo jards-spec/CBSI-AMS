@@ -47,7 +47,6 @@ const defaultForm = {
 };
 
 const Maintenance = () => {
-  
   const confirmDialog = useConfirm();
 const { currentUser, canViewAll } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -104,8 +103,7 @@ const { currentUser, canViewAll } = useAuth();
   }, [canViewAll, currentUser?.id, priorityFilter, searchQuery, statusFilter, tickets]);
 
   const resetForm = () => {
-    
-  const confirmDialog = useConfirm();
+
 setEditingTicket(null);
     setFormData(defaultForm);
   };
@@ -138,8 +136,7 @@ setEditingTicket(null);
   };
 
   const handleEdit = (ticket: Ticket) => {
-    
-  const confirmDialog = useConfirm();
+
 setEditingTicket(ticket);
     setFormData({
       title: ticket.title,
@@ -197,8 +194,7 @@ if (!ok) return;
   };
 
   const getPriorityColor = (priority: string) => {
-    
-  const confirmDialog = useConfirm();
+
 switch (priority) {
       case 'Critical':
         return 'border-red-600/50 bg-red-600/10 text-red-600 dark:text-red-500';
@@ -214,8 +210,7 @@ switch (priority) {
   };
 
   const getStatusIcon = (status: string) => {
-    
-  const confirmDialog = useConfirm();
+
 switch (status) {
       case 'Open':
         return <Clock size={16} className="text-blue-500" />;
@@ -564,6 +559,7 @@ switch (status) {
 };
 
 export default Maintenance;
+
 
 
 
