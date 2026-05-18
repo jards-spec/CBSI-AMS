@@ -6,16 +6,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-/**
- * src/lib/api.ts
- * Centralized API helper.
- */
-
-// ... rest of file
-
-const BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  '/api';  
+const FALLBACK_API_BASE = 'https://asset-backend-3u4j.onrender.com/api';
+const ENV_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
+const BASE = (ENV_BASE || FALLBACK_API_BASE).replace(/\/+$/, '');
 
 const TOKEN_KEY = 'vantage_token';
 const USER_KEY = 'vantage_user';
@@ -71,7 +64,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const res = await fetch(`${BASE}${path}`, {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  const res = await fetch(`${BASE}${normalizedPath}`, {
     ...options,
     headers,
   });
