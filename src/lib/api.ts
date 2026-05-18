@@ -7,8 +7,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 const FALLBACK_API_BASE = 'https://asset-backend-3u4j.onrender.com/api';
-const ENV_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
-const BASE = (ENV_BASE || FALLBACK_API_BASE).replace(/\/+$/, '');
+const ENV_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
+
+const BASE = (() => {
+  const base = ENV_BASE || FALLBACK_API_BASE;
+  return /\/api$/i.test(base) ? base : `${base}/api`;
+})();
 
 const TOKEN_KEY = 'vantage_token';
 const USER_KEY = 'vantage_user';
@@ -158,7 +162,7 @@ export const api = {
       }),
   },
 
-  // keep your assets/employees/... sections below unchanged
+  
 
   
 
