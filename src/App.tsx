@@ -30,6 +30,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import Login from './pages/Login';
 import NotificationBell from './components/NotificationBell';
 import SessionTimeoutWarning from './components/SessionTimeoutWarning';
+import { ConfirmProvider } from './context/ConfirmContext';
 
 // ✅ add these imports
 import ForgotPassword from './pages/ForgotPassword';
@@ -334,6 +335,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
+        <ConfirmProvider>
         <AuthProvider>
   <NotificationProvider>
     <AuditProvider>
@@ -342,6 +344,7 @@ export default function App() {
     </AuditProvider>
   </NotificationProvider>
 </AuthProvider>
+</ConfirmProvider>
       </ThemeProvider>
     </BrowserRouter>
   );
