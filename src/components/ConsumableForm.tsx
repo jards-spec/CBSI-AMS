@@ -85,3 +85,4 @@ const ConsumableForm: React.FC<Props> = ({ onClose }) => {
 };
 
 export default ConsumableForm;
+

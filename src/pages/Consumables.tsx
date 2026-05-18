@@ -52,7 +52,7 @@ const { currentUser } = useAuth();
 
   const handleSave = async (formData: any) => {
     if (!formData.name?.trim() || Number(formData.total) <= 0 || Number(formData.unitCost) < 0) {
-      console.warn('Item name is required. Stock must be greater than zero.');
+      window.alert('Item name is required. Stock must be greater than zero.');
       return;
     }
 
@@ -67,7 +67,7 @@ const { currentUser } = useAuth();
       setIsModalOpen(false);
       setEditingItem(null);
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -80,7 +80,7 @@ const { currentUser } = useAuth();
       });
       await refresh();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -101,7 +101,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -113,7 +113,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -132,7 +132,7 @@ if (!ok) return;
       setSelectedItem(null);
       setTransactionMode(null);
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     } finally {
       setTransactionLoading(false);
     }
@@ -427,5 +427,6 @@ if (!ok) return;
 };
 
 export default Consumables;
+
 
 

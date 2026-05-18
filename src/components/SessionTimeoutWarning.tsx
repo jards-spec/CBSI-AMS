@@ -106,3 +106,4 @@ const SessionTimeoutWarning: React.FC<Props> = ({ warningTime = 5 * 60 * 1000 })
 };
 
 export default SessionTimeoutWarning;
+

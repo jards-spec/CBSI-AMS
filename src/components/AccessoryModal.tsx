@@ -110,3 +110,4 @@ const AccessoryModal = ({ item, onClose, onSave }) => {
 };
 
 export default AccessoryModal;
+

@@ -162,3 +162,4 @@ const AssetCheckinModal: React.FC<Props> = ({ isOpen, onClose, item, onConfirm }
 
 export default AssetCheckinModal;
 
+

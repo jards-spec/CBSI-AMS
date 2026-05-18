@@ -232,13 +232,13 @@ const LicenseComplianceReport = () => {
 
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      console.warn('No data to print. Please adjust your filters.');
+      window.alert('No data to print. Please adjust your filters.');
       return;
     }
 
     const printWindow = window.open('about:blank', '_blank');
     if (!printWindow) {
-      console.warn('Popup blocked. Please allow popups for this site to print.');
+      window.alert('Popup blocked. Please allow popups for this site to print.');
       return;
     }
 
@@ -798,3 +798,4 @@ const SummaryCard = ({
 };
 
 export default LicenseComplianceReport;
+

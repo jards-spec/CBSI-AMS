@@ -83,3 +83,4 @@ const LicenseForm: React.FC<Props> = ({ onClose }) => {
 };
 
 export default LicenseForm;
+

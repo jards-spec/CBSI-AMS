@@ -178,7 +178,7 @@ const prefix =
       setIsModalOpen(false);
       setSelectedAsset(null);
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     } finally {
       setSaving(false);
     }
@@ -195,7 +195,7 @@ const prefix =
       });
       await loadData();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -215,7 +215,7 @@ if (!ok) return;
       });
       await loadData();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -227,7 +227,7 @@ if (!ok) return;
       });
       await loadData();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -246,7 +246,7 @@ if (!ok) return;
       setTransactionMode(null);
       setSelectedAsset(null);
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     } finally {
       setTransactionLoading(false);
     }
@@ -601,5 +601,6 @@ if (!ok) return;
 };
 
 export default Assets;
+
 
 

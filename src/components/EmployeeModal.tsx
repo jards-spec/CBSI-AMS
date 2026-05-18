@@ -245,3 +245,4 @@ const EmployeeModal: React.FC<Props> = ({ employee, onClose, onSave }) => {
 };
 
 export default EmployeeModal;
+

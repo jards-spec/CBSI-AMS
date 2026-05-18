@@ -140,3 +140,4 @@ const ConsumableModal: React.FC<Props> = ({ item, onClose, onSave }) => {
 
 export default ConsumableModal;
 
+

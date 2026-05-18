@@ -80,7 +80,7 @@ const { currentUser } = useAuth();
       setEditingSupplier(null);
       setIsModalOpen(false);
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -100,7 +100,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -112,7 +112,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -588,5 +588,6 @@ e.preventDefault();
 };
 
 export default Suppliers;
+
 
 

@@ -196,3 +196,4 @@ const AssetCheckoutModal: React.FC<Props> = ({ isOpen, onClose, item, employees,
 
 export default AssetCheckoutModal;
 
+

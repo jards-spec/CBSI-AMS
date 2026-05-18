@@ -38,3 +38,4 @@ export function useAssetData() {
 
   return { assets, auditLogs, consumables, accessories, licenses, loading, addLog };
 }
+

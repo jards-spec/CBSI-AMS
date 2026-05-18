@@ -224,3 +224,4 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
 };
 
 export default AssetModal;
+

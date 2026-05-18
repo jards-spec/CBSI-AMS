@@ -139,7 +139,7 @@ const Dashboard = () => {
       await loadDashboardData();
       setIsConsumableModalOpen(false);
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -405,3 +405,4 @@ const ShortcutButton = ({ label, to, icon }: { label: string; to: string; icon: 
 );
 
 export default Dashboard;
+

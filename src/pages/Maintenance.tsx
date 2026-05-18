@@ -133,7 +133,7 @@ setEditingTicket(null);
       setIsModalOpen(false);
       resetForm();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -168,7 +168,7 @@ if (!ok) return;
       });
       await loadTickets();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -180,7 +180,7 @@ if (!ok) return;
       });
       await loadTickets();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -192,7 +192,7 @@ if (!ok) return;
       await api.maintenance.update(ticketId, { ...ticket, status: newStatus });
       await loadTickets();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -564,5 +564,6 @@ switch (status) {
 };
 
 export default Maintenance;
+
 
 

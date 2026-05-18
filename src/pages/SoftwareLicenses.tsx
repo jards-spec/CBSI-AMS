@@ -140,7 +140,7 @@ const isVisible = !!showKeys[license.id];
     }
 
     if (!canRevealSecurityKey) {
-      console.warn('Only Admin/Superuser can reveal security keys.');
+      window.alert('Only Admin/Superuser can reveal security keys.');
       return;
     }
 
@@ -182,7 +182,7 @@ const isVisible = !!showKeys[license.id];
       setEditingLicense(null);
       setIsModalOpen(false);
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -194,7 +194,7 @@ const isVisible = !!showKeys[license.id];
       });
       await refresh();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -214,7 +214,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -226,7 +226,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     }
   };
 
@@ -243,7 +243,7 @@ if (!ok) return;
       setSelectedLicense(null);
       setTransactionMode(null);
     } catch (error: any) {
-      console.warn(error.message);
+      window.alert(error.message);
     } finally {
       setTransactionLoading(false);
     }
@@ -862,5 +862,6 @@ if (!dateString) return 'N/A';
 };
 
 export default SoftwareLicenses;
+
 
 
