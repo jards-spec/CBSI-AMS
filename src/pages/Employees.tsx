@@ -28,7 +28,6 @@ import { useConfirm } from '../context/ConfirmContext';
 type Scope = 'active' | 'archived' | 'all';
 
 const Employees = () => {
-  
   const confirmDialog = useConfirm();
 const { currentUser, logout, canCreate, canEdit, canDelete, canViewAll } = useAuth();
   const [scope, setScope] = useState<Scope>('active');
@@ -145,8 +144,7 @@ if (!ok) return;
   };
 
   const getRoleIcon = (role: string) => {
-    
-  const confirmDialog = useConfirm();
+
 switch (role) {
       case 'Admin':
         return <Crown size={14} className="text-red-600" />;
@@ -160,8 +158,7 @@ switch (role) {
   };
 
   const getRoleBadgeColor = (role: string) => {
-    
-  const confirmDialog = useConfirm();
+
 switch (role) {
       case 'Admin':
         return 'border-red-600/50 bg-red-600/10 text-red-500';
@@ -467,6 +464,7 @@ switch (role) {
 };
 
 export default Employees;
+
 
 
 
