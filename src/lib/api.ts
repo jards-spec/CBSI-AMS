@@ -18,6 +18,14 @@ const TOKEN_KEY = 'vantage_token';
 const USER_KEY = 'vantage_user';
 const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized';
 
+const requireAdminPasswordForEmployeeChange = () => {
+  const value = window.prompt('Confirm your admin password to continue:');
+  if (!value || !value.trim()) {
+    throw new Error('Admin password is required.');
+  }
+  return value.trim();
+};
+
 export type ArchiveScope = 'active' | 'archived' | 'all';
 export type AssignmentScope = 'active' | 'removed' | 'all';
 
@@ -171,9 +179,35 @@ export const api = {
     attachments: (id: string | number) => request<any>(`/assets/${id}/attachments`),
   },
 
-  employees: createArchivableResource('employees'),
-
-  suppliers: createArchivableResource('suppliers'),
+  employees: {
+  list: (scope: ArchiveScope = 'active') => request<any[]>(withScope('/employees', scope)),
+  create: (data: any) =>
+    request<any>('/employees', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, adminPassword: requireAdminPasswordForEmployeeChange() }),
+    }),
+  update: (id: string | number, data: any) =>
+    request<any>(`/employees/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ ...data, adminPassword: requireAdminPasswordForEmployeeChange() }),
+    }),
+  archive: (id: string | number, data: any = {}) =>
+    request<any>(`/employees/${id}/archive`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...data, adminPassword: requireAdminPasswordForEmployeeChange() }),
+    }),
+  restore: (id: string | number, data: any = {}) =>
+    request<any>(`/employees/${id}/restore`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...data, adminPassword: requireAdminPasswordForEmployeeChange() }),
+    }),
+  remove: (id: string | number) =>
+    request<any>(`/employees/${id}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ adminPassword: requireAdminPasswordForEmployeeChange() }),
+    }),
+},
+suppliers: createArchivableResource('suppliers'),
 
   consumables: {
     ...createArchivableResource('consumables'),
@@ -284,5 +318,7 @@ export const api = {
       request<{ report: any[]; pending: any[]; confirmed: any[]; declined: any[]; summary: any }>('/reports/unconfirmed-assignments'),
   },
 };
+
+
 
 
