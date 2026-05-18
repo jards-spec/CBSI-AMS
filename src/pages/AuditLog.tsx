@@ -195,26 +195,27 @@ const PRINT_STYLE = `
   }
 `;
 
-const getLogDate = (log: AuditLogItem) => {
+const MANILA_TZ = 'Asia/Manila';
+
+const parseLogDate = (log: AuditLogItem) => {
   const raw = log.createdAt || log.timestamp;
   if (!raw) return null;
 
+  // If backend sends no timezone, treat it as UTC for consistent conversion
   const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
   const parsed = new Date(normalized);
 
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+const getLogDate = (log: AuditLogItem) => parseLogDate(log);
+
 const formatLogTimestamp = (log: AuditLogItem) => {
-  const raw = log.createdAt || log.timestamp;
-  if (!raw) return '-';
+  const parsed = parseLogDate(log);
+  if (!parsed) return log.createdAt || log.timestamp || '-';
 
-  const normalized = /Z$|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
-  const parsed = new Date(normalized);
-
-  if (Number.isNaN(parsed.getTime())) return raw;
-
-  return parsed.toLocaleString(undefined, {
+  return parsed.toLocaleString('en-PH', {
+    timeZone: MANILA_TZ,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -223,6 +224,24 @@ const formatLogTimestamp = (log: AuditLogItem) => {
     second: '2-digit',
     hour12: true,
   });
+};
+
+const getManilaDateKey = (log: AuditLogItem) => {
+  const parsed = parseLogDate(log);
+  if (!parsed) return null;
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: MANILA_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(parsed);
+
+  const y = parts.find((p) => p.type === 'year')?.value;
+  const m = parts.find((p) => p.type === 'month')?.value;
+  const d = parts.find((p) => p.type === 'day')?.value;
+
+  return y && m && d ? `${y}-${m}-${d}` : null;
 };
 
 export default function AuditLog() {
@@ -291,13 +310,10 @@ if (!ok) return;
 
       const matchesType = activeType === 'ALL' || log.type === activeType;
 
-      const logDate = getLogDate(log);
-      const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
-      const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
-
-      const matchesDate =
-        (!start || (logDate && logDate >= start)) &&
-        (!end || (logDate && logDate <= end));
+      const manilaDate = getManilaDateKey(log);
+const matchesDate =
+  (!startDate || (manilaDate && manilaDate >= startDate)) &&
+  (!endDate || (manilaDate && manilaDate <= endDate));
 
       return matchesSearch && matchesType && matchesDate;
     });
@@ -354,7 +370,7 @@ const buildPrintHtml = () => {
     .map(
       (log) => `
       <tr>
-        <td>${escapeHtml(formatLogTimestamp(log))}</td>
+        ${escapeHtml(formatLogTimestamp(log))}
         <td>${escapeHtml(log.type || '')}</td>
         <td>${escapeHtml(log.entity || '-')}</td>
         <td>${escapeHtml(log.message || '-')}</td>
