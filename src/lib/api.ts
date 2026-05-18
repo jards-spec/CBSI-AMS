@@ -1,4 +1,4 @@
-/**
+﻿/**
  * src/lib/api.ts
  * Centralized API helper.
  */

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { X, User, Box, Calendar, Check, Search, Info } from 'lucide-react';
 
 interface Props {
@@ -195,3 +195,4 @@ const AssetCheckoutModal: React.FC<Props> = ({ isOpen, onClose, item, employees,
 };
 
 export default AssetCheckoutModal;
+

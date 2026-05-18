@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Calendar, Check, Package, RotateCcw, User, X, Hash } from 'lucide-react';
 
 type ResourceType = 'asset' | 'component' | 'accessory' | 'consumable' | 'license';
@@ -68,7 +68,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const getAssetLabel = (asset: any) => {
     if (!asset) return 'Unknown Asset';
-    if (asset.tag && asset.name) return `${asset.tag} — ${asset.name}`;
+    if (asset.tag && asset.name) return `${asset.tag} â€” ${asset.name}`;
     return asset.name || asset.tag || asset.id || 'Unknown Asset';
   };
 
@@ -77,7 +77,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     const assetLabel = linkedAsset
       ? getAssetLabel(linkedAsset)
       : assignment.assetTag
-        ? `${assignment.assetTag} — ${assignment.assetName || 'Unknown Asset'}`
+        ? `${assignment.assetTag} â€” ${assignment.assetName || 'Unknown Asset'}`
         : assignment.assetName || assignment.assetId || 'Unknown Asset';
 
     const qty = Number(assignment.quantity || 1);
@@ -88,7 +88,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     const number = employee?.employeeNumber ? String(employee.employeeNumber).toUpperCase() : 'NO-ID';
     const name = employee?.name || 'Unknown Employee';
     const department = employee?.department || 'Unassigned';
-    return `${number} — ${name} (${department})`;
+    return `${number} â€” ${name} (${department})`;
   };
 
   useEffect(() => {

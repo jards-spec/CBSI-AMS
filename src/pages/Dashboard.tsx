@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -139,7 +139,7 @@ const Dashboard = () => {
       await loadDashboardData();
       setIsConsumableModalOpen(false);
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 

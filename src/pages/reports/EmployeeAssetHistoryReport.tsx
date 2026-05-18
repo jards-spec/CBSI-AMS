@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
   Download,
   Users,
@@ -160,7 +160,7 @@ const EmployeeAssetHistoryReport = () => {
   const departments = ['All', ...Array.from(new Set(data.map((e) => e.department).filter(Boolean)))];
 
   const buildPrintHtml = (tableHTML: string) => {
-    const summaryData = `Generated: ${new Date().toLocaleString()}  •  Total Employees: ${filteredData.length}  •  Total Value: ${formatCurrency(summary?.totalValueAssigned || 0)}`;
+    const summaryData = `Generated: ${new Date().toLocaleString()}  â€¢  Total Employees: ${filteredData.length}  â€¢  Total Value: ${formatCurrency(summary?.totalValueAssigned || 0)}`;
     
     return `
       <!doctype html>
@@ -193,13 +193,13 @@ const EmployeeAssetHistoryReport = () => {
 
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      alert('No data to print. Please adjust your filters.');
+      console.warn('No data to print. Please adjust your filters.');
       return;
     }
 
     const printWindow = window.open('about:blank', '_blank');
     if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site to print.');
+      console.warn('Popup blocked. Please allow popups for this site to print.');
       return;
     }
 
@@ -224,10 +224,10 @@ const EmployeeAssetHistoryReport = () => {
               <td>${item.employeeNumber}</td>
               <td>${item.department}</td>
               <td>${item.assetCount}</td>
-              <td>₱${item.totalAssetValue.toFixed(2)}</td>
+              <td>â‚±${item.totalAssetValue.toFixed(2)}</td>
               <td>${item.licenseCount}</td>
-              <td>₱${item.totalLicenseValue.toFixed(2)}</td>
-              <td>₱${item.totalValue.toFixed(2)}</td>
+              <td>â‚±${item.totalLicenseValue.toFixed(2)}</td>
+              <td>â‚±${item.totalValue.toFixed(2)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -263,7 +263,7 @@ const EmployeeAssetHistoryReport = () => {
         <div className="mb-6 border-b-2 border-black pb-3">
           <h1 className="text-xl font-bold">Employee Asset History Report</h1>
           <p className="text-xs mt-1">Generated: {new Date().toLocaleString()}</p>
-          <p className="text-xs">Total Employees: {filteredData.length}  •  Total Value: {formatCurrency(summary?.totalValueAssigned || 0)}</p>
+          <p className="text-xs">Total Employees: {filteredData.length}  â€¢  Total Value: {formatCurrency(summary?.totalValueAssigned || 0)}</p>
         </div>
         
         <table className="w-full border-collapse">
@@ -286,10 +286,10 @@ const EmployeeAssetHistoryReport = () => {
                 <td className="border border-black px-2 py-1">{emp.employeeNumber}</td>
                 <td className="border border-black px-2 py-1">{emp.department}</td>
                 <td className="border border-black px-2 py-1 text-center">{emp.assetCount}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{emp.totalAssetValue.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{emp.totalAssetValue.toFixed(2)}</td>
                 <td className="border border-black px-2 py-1 text-center">{emp.licenseCount}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{emp.totalLicenseValue.toFixed(2)}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{emp.totalValue.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{emp.totalLicenseValue.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{emp.totalValue.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -448,7 +448,7 @@ const EmployeeAssetHistoryReport = () => {
                         )}
                       </div>
                       <div className="mt-1 text-[9px] text-slate-500">
-                        ✓ {emp.confirmedCount} &nbsp; ✗ {emp.declinedCount}
+                        âœ“ {emp.confirmedCount} &nbsp; âœ— {emp.declinedCount}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Plus, DollarSign, CalendarDays } from 'lucide-react';
 
 interface Props {
@@ -139,3 +139,4 @@ const ConsumableModal: React.FC<Props> = ({ item, onClose, onSave }) => {
 };
 
 export default ConsumableModal;
+

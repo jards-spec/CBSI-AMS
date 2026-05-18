@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
   AlertTriangle,
   CheckCircle,
@@ -199,7 +199,7 @@ const LicenseComplianceReport = () => {
       ? `To: ${endDate}`
       : 'All Dates';
     
-    const summaryData = `Generated: ${new Date().toLocaleString()}  •  ${dateRangeText}  •  Total Licenses: ${filteredData.length}  •  Expired: ${summary?.expiredCount || 0}  •  Over-Allocated: ${summary?.overAllocatedCount || 0}`;
+    const summaryData = `Generated: ${new Date().toLocaleString()}  â€¢  ${dateRangeText}  â€¢  Total Licenses: ${filteredData.length}  â€¢  Expired: ${summary?.expiredCount || 0}  â€¢  Over-Allocated: ${summary?.overAllocatedCount || 0}`;
     
     return `
       <!doctype html>
@@ -232,13 +232,13 @@ const LicenseComplianceReport = () => {
 
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      alert('No data to print. Please adjust your filters.');
+      console.warn('No data to print. Please adjust your filters.');
       return;
     }
 
     const printWindow = window.open('about:blank', '_blank');
     if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site to print.');
+      console.warn('Popup blocked. Please allow popups for this site to print.');
       return;
     }
 
@@ -268,7 +268,7 @@ const LicenseComplianceReport = () => {
               <td>${item.expirationDate || 'N/A'}</td>
               <td>${item.daysUntilExpiration ?? 'N/A'}</td>
               <td>${item.expirationStatus}</td>
-              <td>₱${item.totalValue.toFixed(2)}</td>
+              <td>â‚±${item.totalValue.toFixed(2)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -363,11 +363,11 @@ const LicenseComplianceReport = () => {
               : endDate
               ? `To: ${endDate}`
               : 'All Dates'}
-            {'  •  '}
+            {'  â€¢  '}
             Total Licenses: {filteredData.length}
-            {'  •  '}
+            {'  â€¢  '}
             Expired: {summary?.expiredCount || 0}
-            {'  •  '}
+            {'  â€¢  '}
             Over-Allocated: {summary?.overAllocatedCount || 0}
           </p>
         </div>
@@ -397,7 +397,7 @@ const LicenseComplianceReport = () => {
                 <td className="border border-black px-2 py-1">{license.expirationDate || 'N/A'}</td>
                 <td className="border border-black px-2 py-1 text-center">{license.daysUntilExpiration ?? 'N/A'}</td>
                 <td className="border border-black px-2 py-1">{license.expirationStatus}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{license.totalValue.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{license.totalValue.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -515,7 +515,7 @@ const LicenseComplianceReport = () => {
               label="Expiring Soon"
               value={summary.expiringSoonCount}
               color="orange"
-              subtitle="≤30 days"
+              subtitle="â‰¤30 days"
             />
             <SummaryCard
               icon={<Clock size={18} />}
@@ -539,7 +539,7 @@ const LicenseComplianceReport = () => {
               subtitle="Across all licenses"
             />
             <SummaryCard
-              icon={<span className="text-lg font-bold">₱</span>}
+              icon={<span className="text-lg font-bold">â‚±</span>}
               label="Total Value"
               value={formatCurrency(summary.totalValue)}
               color="emerald"

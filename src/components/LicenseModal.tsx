@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, Save, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -181,3 +181,4 @@ const LicenseModal = ({ license, onClose, onSave }) => {
 };
 
 export default LicenseModal;
+

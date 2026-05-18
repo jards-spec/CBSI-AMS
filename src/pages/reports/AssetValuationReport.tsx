@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
   Download,
   Package,
@@ -181,7 +181,7 @@ const AssetValuationReport = () => {
       ? `To: ${endDate}`
       : 'All Dates';
     
-    const summaryData = `Generated: ${new Date().toLocaleString()}  •  ${dateRangeText}  •  Total Assets: ${filteredData.length}  •  Total Value: ${formatCurrency(summary?.totalValue || 0)}`;
+    const summaryData = `Generated: ${new Date().toLocaleString()}  â€¢  ${dateRangeText}  â€¢  Total Assets: ${filteredData.length}  â€¢  Total Value: ${formatCurrency(summary?.totalValue || 0)}`;
     
     return `
       <!doctype html>
@@ -214,13 +214,13 @@ const AssetValuationReport = () => {
 
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      alert('No data to print. Please adjust your filters.');
+      console.warn('No data to print. Please adjust your filters.');
       return;
     }
 
     const printWindow = window.open('about:blank', '_blank');
     if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site to print.');
+      console.warn('Popup blocked. Please allow popups for this site to print.');
       return;
     }
 
@@ -246,7 +246,7 @@ const AssetValuationReport = () => {
               <td>${item.name}</td>
               <td>${item.category}</td>
               <td>${item.status}</td>
-              <td>₱${item.unitCost.toFixed(2)}</td>
+              <td>â‚±${item.unitCost.toFixed(2)}</td>
               <td>${item.purchaseDate || 'N/A'}</td>
               <td>${item.ageInYears !== null ? item.ageInYears + 'y' : 'N/A'}</td>
               <td>${item.assignedTo || 'Unassigned'}</td>
@@ -311,9 +311,9 @@ const AssetValuationReport = () => {
               : endDate
               ? `To: ${endDate}`
               : 'All Dates'}
-            {'  •  '}
+            {'  â€¢  '}
             Total Assets: {filteredData.length}
-            {'  •  '}
+            {'  â€¢  '}
             Total Value: {formatCurrency(summary?.totalValue || 0)}
           </p>
         </div>
@@ -339,7 +339,7 @@ const AssetValuationReport = () => {
                 <td className="border border-black px-2 py-1">{asset.name}</td>
                 <td className="border border-black px-2 py-1">{asset.category}</td>
                 <td className="border border-black px-2 py-1 text-center">{asset.status}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{asset.unitCost.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{asset.unitCost.toFixed(2)}</td>
                 <td className="border border-black px-2 py-1">{asset.purchaseDate || 'N/A'}</td>
                 <td className="border border-black px-2 py-1 text-center">{asset.ageInYears !== null ? asset.ageInYears + 'y' : 'N/A'}</td>
                 <td className="border border-black px-2 py-1">{asset.assignedTo || 'Unassigned'}</td>

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { X, Printer, LayoutGrid } from 'lucide-react';
 
 interface Props {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
   Download,
   Wrench,
@@ -201,7 +201,7 @@ const MaintenanceCostReport = () => {
       ? `To: ${endDate}`
       : 'All Dates';
     
-    const summaryData = `Generated: ${new Date().toLocaleString()}  •  ${dateRangeText}  •  Total Tickets: ${filteredData.length}  •  Total Cost: ${formatCurrency(summary?.totalCost || 0)}`;
+    const summaryData = `Generated: ${new Date().toLocaleString()}  â€¢  ${dateRangeText}  â€¢  Total Tickets: ${filteredData.length}  â€¢  Total Cost: ${formatCurrency(summary?.totalCost || 0)}`;
     
     return `
       <!doctype html>
@@ -234,13 +234,13 @@ const MaintenanceCostReport = () => {
 
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      alert('No data to print. Please adjust your filters.');
+      console.warn('No data to print. Please adjust your filters.');
       return;
     }
 
     const printWindow = window.open('about:blank', '_blank');
     if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site to print.');
+      console.warn('Popup blocked. Please allow popups for this site to print.');
       return;
     }
 
@@ -268,7 +268,7 @@ const MaintenanceCostReport = () => {
               <td>${item.category}</td>
               <td>${item.priority}</td>
               <td>${item.status}</td>
-              <td>₱${item.cost.toFixed(2)}</td>
+              <td>â‚±${item.cost.toFixed(2)}</td>
               <td>${item.costVsValue.toFixed(1)}%</td>
               <td>${item.submittedAt}</td>
             </tr>
@@ -344,9 +344,9 @@ const MaintenanceCostReport = () => {
               : endDate
               ? `To: ${endDate}`
               : 'All Dates'}
-            {'  •  '}
+            {'  â€¢  '}
             Total Tickets: {filteredData.length}
-            {'  •  '}
+            {'  â€¢  '}
             Total Cost: {formatCurrency(summary?.totalCost || 0)}
           </p>
         </div>
@@ -374,7 +374,7 @@ const MaintenanceCostReport = () => {
                 <td className="border border-black px-2 py-1">{ticket.category}</td>
                 <td className="border border-black px-2 py-1 text-center">{ticket.priority}</td>
                 <td className="border border-black px-2 py-1 text-center">{ticket.status}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{ticket.cost.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{ticket.cost.toFixed(2)}</td>
                 <td className="border border-black px-2 py-1 text-center">{ticket.costVsValue.toFixed(1)}%</td>
                 <td className="border border-black px-2 py-1">{ticket.submittedAt}</td>
               </tr>

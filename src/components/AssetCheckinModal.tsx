@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { X, RefreshCcw, MapPin, Calendar, Check } from 'lucide-react';
 
 interface Props {
@@ -161,3 +161,4 @@ const AssetCheckinModal: React.FC<Props> = ({ isOpen, onClose, item, onConfirm }
 };
 
 export default AssetCheckinModal;
+

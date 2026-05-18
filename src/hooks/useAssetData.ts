@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import type { Asset, AuditLog, Consumable, Accessory, License } from '../types';
 
 export function useAssetData() {

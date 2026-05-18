@@ -148,7 +148,7 @@ setEditingItem(item);
       setFormData(defaultForm);
       await refresh();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -165,7 +165,7 @@ setEditingItem(item);
       });
       await refresh();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -185,7 +185,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -197,7 +197,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -233,7 +233,7 @@ if (!ok) return;
       setActiveAssignments([]);
       await refresh();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -663,4 +663,5 @@ switch (status?.toUpperCase()) {
 };
 
 export default Components;
+
 

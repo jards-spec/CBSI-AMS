@@ -247,7 +247,7 @@ setRequestor((current) => ({
     );
 
     if (missingSpecs) {
-      alert('Please select both processor and memory for all desktop or laptop requests.');
+      console.warn('Please select both processor and memory for all desktop or laptop requests.');
       return;
     }
 
@@ -274,7 +274,7 @@ setRequestor((current) => ({
       setItems([createDefaultItem()]);
       setView('list');
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -283,7 +283,7 @@ setRequestor((current) => ({
       await api.requests.updateStatus(id, newStatus);
       await loadRequests();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -303,7 +303,7 @@ if (!ok) return;
       });
       await loadRequests();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -315,7 +315,7 @@ if (!ok) return;
       });
       await loadRequests();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -803,4 +803,5 @@ const selectedExec = approvingExecs[request.id] || EXECUTIVES[0];
 };
 
 export default Requests;
+
 

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+﻿import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
 export type LogType =
@@ -35,7 +35,7 @@ export interface AuditContextType {
   refreshLogs: () => Promise<void>;
 }
 
-// ✅ ADD 'export' HERE (line 38)
+// âœ… ADD 'export' HERE (line 38)
 export const AuditContext = createContext<AuditContextType | undefined>(undefined);
 
 export const AuditProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

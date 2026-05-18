@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
   Download,
   AlertCircle,
@@ -167,7 +167,7 @@ const UnconfirmedAssignmentsReport = () => {
   });
 
   const buildPrintHtml = (tableHTML: string) => {
-    const summaryData = `Generated: ${new Date().toLocaleString()}  •  Total: ${filteredData.length}  •  Pending: ${summary?.pendingCount || 0}  •  Overdue: ${summary?.overdueCount || 0}`;
+    const summaryData = `Generated: ${new Date().toLocaleString()}  â€¢  Total: ${filteredData.length}  â€¢  Pending: ${summary?.pendingCount || 0}  â€¢  Overdue: ${summary?.overdueCount || 0}`;
     
     return `
       <!doctype html>
@@ -200,13 +200,13 @@ const UnconfirmedAssignmentsReport = () => {
 
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      alert('No data to print. Please adjust your filters.');
+      console.warn('No data to print. Please adjust your filters.');
       return;
     }
 
     const printWindow = window.open('about:blank', '_blank');
     if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site to print.');
+      console.warn('Popup blocked. Please allow popups for this site to print.');
       return;
     }
 
@@ -307,7 +307,7 @@ const UnconfirmedAssignmentsReport = () => {
         <div className="mb-6 border-b-2 border-black pb-3">
           <h1 className="text-xl font-bold">Unconfirmed Assignments Report</h1>
           <p className="text-xs mt-1">Generated: {new Date().toLocaleString()}</p>
-          <p className="text-xs">Total: {filteredData.length}  •  Pending: {summary?.pendingCount || 0}  •  Overdue: {summary?.overdueCount || 0}</p>
+          <p className="text-xs">Total: {filteredData.length}  â€¢  Pending: {summary?.pendingCount || 0}  â€¢  Overdue: {summary?.overdueCount || 0}</p>
         </div>
         
         <table className="w-full border-collapse">

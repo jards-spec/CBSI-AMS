@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   LogIn,
@@ -194,7 +194,7 @@ const Login = () => {
               </p>
             </div>
 
-            {/* “welcome skit” panel */}
+            {/* â€œwelcome skitâ€ panel */}
             <div className="rounded-2xl border border-slate-800 bg-[#111624] p-6">
               <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 italic">
                 Quick Guide // Read Me
@@ -220,7 +220,7 @@ const Login = () => {
                   System Notice
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Inventory visibility is role-based. If you don’t see inventory pages, your account may be configured
+                  Inventory visibility is role-based. If you donâ€™t see inventory pages, your account may be configured
                   as <span className="font-bold text-white">User</span>.
                 </p>
               </div>
@@ -287,7 +287,7 @@ const Login = () => {
                   </div>
                 </div>
 
-                {/* ✅ Forgot password link */}
+                {/* âœ… Forgot password link */}
                 <div className="flex items-center justify-end">
                   <Link
                     to="/forgot-password"

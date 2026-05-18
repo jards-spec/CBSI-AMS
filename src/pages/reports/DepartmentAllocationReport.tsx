@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
   Download,
   Users,
@@ -149,7 +149,7 @@ const DepartmentAllocationReport = () => {
   }, [data]);
 
   const buildPrintHtml = (tableHTML: string) => {
-    const summaryData = `Generated: ${new Date().toLocaleString()}  •  Total Departments: ${filteredData.length}  •  Total Value: ${formatCurrency(summary?.totalValue || 0)}`;
+    const summaryData = `Generated: ${new Date().toLocaleString()}  â€¢  Total Departments: ${filteredData.length}  â€¢  Total Value: ${formatCurrency(summary?.totalValue || 0)}`;
     
     return `
       <!doctype html>
@@ -182,13 +182,13 @@ const DepartmentAllocationReport = () => {
 
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      alert('No data to print.');
+      console.warn('No data to print.');
       return;
     }
 
     const printWindow = window.open('about:blank', '_blank');
     if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site to print.');
+      console.warn('Popup blocked. Please allow popups for this site to print.');
       return;
     }
 
@@ -212,11 +212,11 @@ const DepartmentAllocationReport = () => {
               <td>${item.department}</td>
               <td>${item.employeeCount}</td>
               <td>${item.assetCount}</td>
-              <td>₱${item.assetValue.toFixed(2)}</td>
+              <td>â‚±${item.assetValue.toFixed(2)}</td>
               <td>${item.licenseCount}</td>
-              <td>₱${item.licenseValue.toFixed(2)}</td>
-              <td>₱${item.totalValue.toFixed(2)}</td>
-              <td>₱${item.perEmployeeValue.toFixed(2)}</td>
+              <td>â‚±${item.licenseValue.toFixed(2)}</td>
+              <td>â‚±${item.totalValue.toFixed(2)}</td>
+              <td>â‚±${item.perEmployeeValue.toFixed(2)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -252,7 +252,7 @@ const DepartmentAllocationReport = () => {
         <div className="mb-6 border-b-2 border-black pb-3">
           <h1 className="text-xl font-bold">Department Allocation Report</h1>
           <p className="text-xs mt-1">Generated: {new Date().toLocaleString()}</p>
-          <p className="text-xs">Total Departments: {filteredData.length}  •  Total Value: {formatCurrency(summary?.totalValue || 0)}</p>
+          <p className="text-xs">Total Departments: {filteredData.length}  â€¢  Total Value: {formatCurrency(summary?.totalValue || 0)}</p>
         </div>
         
         <table className="w-full border-collapse">
@@ -274,11 +274,11 @@ const DepartmentAllocationReport = () => {
                 <td className="border border-black px-2 py-1">{dept.department}</td>
                 <td className="border border-black px-2 py-1 text-center">{dept.employeeCount}</td>
                 <td className="border border-black px-2 py-1 text-center">{dept.assetCount}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{dept.assetValue.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{dept.assetValue.toFixed(2)}</td>
                 <td className="border border-black px-2 py-1 text-center">{dept.licenseCount}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{dept.licenseValue.toFixed(2)}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{dept.totalValue.toFixed(2)}</td>
-                <td className="border border-black px-2 py-1 text-right">₱{dept.perEmployeeValue.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{dept.licenseValue.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{dept.totalValue.toFixed(2)}</td>
+                <td className="border border-black px-2 py-1 text-right">â‚±{dept.perEmployeeValue.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
@@ -407,15 +407,15 @@ const DepartmentAllocationReport = () => {
                     <td className="px-4 py-4 text-center">
                       {index === 0 ? (
                         <span className="flex items-center justify-center gap-1 text-[10px] font-black text-yellow-600 dark:text-yellow-500">
-                          🥇 1
+                          ðŸ¥‡ 1
                         </span>
                       ) : index === 1 ? (
                         <span className="flex items-center justify-center gap-1 text-[10px] font-black text-slate-600 dark:text-slate-400">
-                          🥈 2
+                          ðŸ¥ˆ 2
                         </span>
                       ) : index === 2 ? (
                         <span className="flex items-center justify-center gap-1 text-[10px] font-black text-orange-600 dark:text-orange-500">
-                          🥉 3
+                          ðŸ¥‰ 3
                         </span>
                       ) : (
                         <span className="font-mono text-slate-500">{index + 1}</span>

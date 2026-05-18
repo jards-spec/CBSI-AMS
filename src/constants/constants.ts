@@ -1,4 +1,4 @@
-export const DEPARTMENTS = [
+﻿export const DEPARTMENTS = [
   { name: 'Editorial Department', head: 'Bryan Defita' },
   { name: 'Creatives', head: 'Cathy Perez' },
   { name: 'Picturebooks Department', head: 'Nitz Vilante' },

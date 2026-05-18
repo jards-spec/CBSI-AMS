@@ -414,18 +414,18 @@ const buildPrintHtml = () => {
 
   const handlePrint = () => {
   if (!rangeReadyForPrint) {
-    alert('Please select both a From date and a To date before printing.');
+    console.warn('Please select both a From date and a To date before printing.');
     return;
   }
 
   if (filteredLogs.length === 0) {
-    alert('There are no audit log entries inside the selected date range.');
+    console.warn('There are no audit log entries inside the selected date range.');
     return;
   }
 
   const printWindow = window.open('about:blank', '_blank');
   if (!printWindow) {
-    alert('Popup blocked. Please allow popups for this site to print.');
+    console.warn('Popup blocked. Please allow popups for this site to print.');
     return;
   }
 
@@ -799,3 +799,4 @@ const buildPrintHtml = () => {
     </div>
   );
 }
+

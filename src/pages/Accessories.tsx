@@ -78,7 +78,7 @@ const { currentUser } = useAuth();
       setIsModalOpen(false);
       setEditingItem(null);
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -91,7 +91,7 @@ const { currentUser } = useAuth();
       });
       await refresh();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -111,7 +111,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -123,7 +123,7 @@ if (!ok) return;
       });
       await refresh();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -157,7 +157,7 @@ if (!ok) return;
       setTransactionMode(null);
       setActiveAssignments([]);
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     } finally {
       setTransactionLoading(false);
     }
@@ -416,4 +416,5 @@ if (!ok) return;
 };
 
 export default Accessories;
+
 

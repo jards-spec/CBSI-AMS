@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Plus, Hash, Building, Package, Calendar } from 'lucide-react';
 
 interface Props {
@@ -166,7 +166,7 @@ const AssetModal: React.FC<Props> = ({ asset, onClose, onSave }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Unit Cost (₱)</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase italic tracking-widest">Unit Cost (â‚±)</label>
               <input 
                 type="number"
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-[10px] font-black outline-none focus:border-emerald-500"

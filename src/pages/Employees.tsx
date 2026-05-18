@@ -92,18 +92,18 @@ const { currentUser, logout, canCreate, canEdit, canDelete, canViewAll } = useAu
       setIsModalOpen(false);
       setEditingEmployee(null);
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
   const handleArchive = async (employee: any) => {
     if (!canDelete()) {
-      alert('You do not have permission to archive employees.');
+      console.warn('You do not have permission to archive employees.');
       return;
     }
 
     if (employee.id === currentUser?.id) {
-      alert('You cannot archive your own profile.');
+      console.warn('You cannot archive your own profile.');
       return;
     }
 
@@ -123,13 +123,13 @@ if (!ok) return;
       });
       await loadData();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
   const handleRestore = async (employee: any) => {
     if (!canDelete()) {
-      alert('You do not have permission to restore employees.');
+      console.warn('You do not have permission to restore employees.');
       return;
     }
 
@@ -140,7 +140,7 @@ if (!ok) return;
       });
       await loadData();
     } catch (error: any) {
-      alert(error.message);
+      console.warn(error.message);
     }
   };
 
@@ -467,4 +467,5 @@ switch (role) {
 };
 
 export default Employees;
+
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -32,7 +32,7 @@ import NotificationBell from './components/NotificationBell';
 import SessionTimeoutWarning from './components/SessionTimeoutWarning';
 import { ConfirmProvider } from './context/ConfirmContext';
 
-// ✅ add these imports
+// âœ… add these imports
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
@@ -69,7 +69,7 @@ function AppContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
 
-  // ✅ IMPORTANT: When logged out, use Routes (so /forgot-password works)
+  // âœ… IMPORTANT: When logged out, use Routes (so /forgot-password works)
   if (!currentUser) {
     return (
       <Routes>
@@ -254,7 +254,7 @@ function AppContent() {
                     <span className="text-[8px] font-black uppercase tracking-wider">{currentUser.role}</span>
                   </div>
 
-                  <span className="text-[8px] font-black uppercase text-slate-400 dark:text-slate-600">•</span>
+                  <span className="text-[8px] font-black uppercase text-slate-400 dark:text-slate-600">â€¢</span>
 
                   <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-600">
                     {currentUser.department}
@@ -262,7 +262,7 @@ function AppContent() {
 
                   {currentUser.employeeNumber ? (
                     <>
-                      <span className="text-[8px] font-black uppercase text-slate-400 dark:text-slate-600">•</span>
+                      <span className="text-[8px] font-black uppercase text-slate-400 dark:text-slate-600">â€¢</span>
                       <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-600">
                         {currentUser.employeeNumber}
                       </span>
