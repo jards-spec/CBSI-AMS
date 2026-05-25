@@ -88,7 +88,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     const number = employee?.employeeNumber ? String(employee.employeeNumber).toUpperCase() : 'NO-ID';
     const name = employee?.name || 'Unknown Employee';
     const department = employee?.department || 'Unassigned';
-    return `${number} â€” ${name} (${department})`;
+    return `${number} ${name} (${department})`;
   };
 
   useEffect(() => {
