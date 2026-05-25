@@ -18,14 +18,6 @@ const TOKEN_KEY = 'vantage_token';
 const USER_KEY = 'vantage_user';
 const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized';
 
-const requireAdminPasswordForEmployeeChange = () => {
-  const value = window.prompt('Confirm your admin password to continue:');
-  if (!value || !value.trim()) {
-    throw new Error('Admin password is required.');
-  }
-  return value.trim();
-};
-
 export type ArchiveScope = 'active' | 'archived' | 'all';
 export type AssignmentScope = 'active' | 'removed' | 'all';
 
@@ -77,41 +69,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  const method = (options.method || 'GET').toUpperCase();
-  const isEmployeePath = /^\/employees(\/|$)/.test(normalizedPath);
-  const isEmployeeMutation = isEmployeePath && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-
-  let outgoingBody = options.body;
-
-  if (isEmployeeMutation) {
-    let parsed: any = {};
-
-    if (typeof outgoingBody === 'string' && outgoingBody.length > 0) {
-      try {
-        parsed = JSON.parse(outgoingBody);
-      } catch {
-        parsed = {};
-      }
-    }
-
-    if (!parsed.adminPassword) {
-      const entered = window.prompt('Confirm your admin password to continue:');
-      if (!entered || !entered.trim()) {
-        throw new Error('Admin password is required.');
-      }
-      parsed.adminPassword = entered.trim();
-    }
-
-    outgoingBody = JSON.stringify(parsed);
-
-    if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json');
-    }
-  }
 
   const res = await fetch(`${BASE}${normalizedPath}`, {
     ...options,
-    body: outgoingBody,
+    body: options.body,
     headers,
   });
 
@@ -119,10 +80,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const err = await res.json().catch(() => ({ error: res.statusText }));
 
     if (res.status === 401 && !isAuthPath(path)) {
-      // IMPORTANT: don't auto-logout for employee admin re-auth failures
-      if (!isEmployeePath) {
-        handleUnauthorized();
-      }
+      handleUnauthorized();
     }
 
     throw new Error(err.error ?? 'Request failed');
@@ -205,55 +163,50 @@ export const api = {
       }),
   },
 
-  
-
-  
-
   assets: {
     ...createArchivableResource('assets'),
     attachments: (id: string | number) => request<any>(`/assets/${id}/attachments`),
   },
 
   employees: {
-  list: (scope: ArchiveScope = 'active') => request<any[]>(withScope('/employees', scope)),
-  create: (data: any) =>
-    request<any>('/employees', {
-      method: 'POST',
-      body: JSON.stringify({ ...data, adminPassword: requireAdminPasswordForEmployeeChange() }),
-    }),
-  update: (id: string | number, data: any) =>
-    request<any>(`/employees/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ ...data, adminPassword: requireAdminPasswordForEmployeeChange() }),
-    }),
-  archive: (id: string | number, data: any = {}) =>
-    request<any>(`/employees/${id}/archive`, {
-      method: 'PATCH',
-      body: JSON.stringify({ ...data, adminPassword: requireAdminPasswordForEmployeeChange() }),
-    }),
-  restore: (id: string | number, data: any = {}) =>
-    request<any>(`/employees/${id}/restore`, {
-      method: 'PATCH',
-      body: JSON.stringify({ ...data, adminPassword: requireAdminPasswordForEmployeeChange() }),
-    }),
-  remove: (id: string | number) =>
-    request<any>(`/employees/${id}`, {
-      method: 'DELETE',
-      body: JSON.stringify({ adminPassword: requireAdminPasswordForEmployeeChange() }),
-    }),
-},
-suppliers: createArchivableResource('suppliers'),
+    list: (scope: ArchiveScope = 'active') => request<any[]>(withScope('/employees', scope)),
+    create: (data: any) =>
+      request<any>('/employees', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string | number, data: any) =>
+      request<any>(`/employees/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    archive: (id: string | number, data: any = {}) =>
+      request<any>(`/employees/${id}/archive`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    restore: (id: string | number, data: any = {}) =>
+      request<any>(`/employees/${id}/restore`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string | number, data: any = {}) =>
+      request<any>(`/employees/${id}`, {
+        method: 'DELETE',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  suppliers: createArchivableResource('suppliers'),
 
   consumables: {
     ...createArchivableResource('consumables'),
-    checkout: (id: string | number) =>
-      request<any>(`/consumables/${id}/checkout`, { method: 'PATCH' }),
+    checkout: (id: string | number) => request<any>(`/consumables/${id}/checkout`, { method: 'PATCH' }),
   },
 
   accessories: {
     ...createArchivableResource('accessories'),
-    checkout: (id: string | number) =>
-      request<any>(`/accessories/${id}/checkout`, { method: 'PATCH' }),
+    checkout: (id: string | number) => request<any>(`/accessories/${id}/checkout`, { method: 'PATCH' }),
     assignments: (id: string | number, status: AssignmentScope = 'active') =>
       request<any[]>(withAssignmentScope(`/accessories/${id}/assignments`, status)),
   },
@@ -292,46 +245,31 @@ suppliers: createArchivableResource('suppliers'),
 
   components: {
     ...createArchivableResource('components'),
-    checkin: (id: number | string) =>
-      request<any>(`/components/${id}/checkin`, { method: 'PATCH' }),
-    checkout: (id: number | string) =>
-      request<any>(`/components/${id}/checkout`, { method: 'PATCH' }),
+    checkin: (id: number | string) => request<any>(`/components/${id}/checkin`, { method: 'PATCH' }),
+    checkout: (id: number | string) => request<any>(`/components/${id}/checkout`, { method: 'PATCH' }),
     assignments: (id: number | string, status: AssignmentScope = 'active') =>
       request<any[]>(withAssignmentScope(`/components/${id}/assignments`, status)),
   },
 
   transactions: {
-    checkout: (data: any) =>
-      request<any>('/transactions/checkout', { method: 'POST', body: JSON.stringify(data) }),
-    checkin: (data: any) =>
-      request<any>('/transactions/checkin', { method: 'POST', body: JSON.stringify(data) }),
+    checkout: (data: any) => request<any>('/transactions/checkout', { method: 'POST', body: JSON.stringify(data) }),
+    checkin: (data: any) => request<any>('/transactions/checkin', { method: 'POST', body: JSON.stringify(data) }),
   },
 
   notifications: {
-    me: (unreadOnly = false) =>
-      request<any[]>(`/notifications/me${unreadOnly ? '?unreadOnly=true' : ''}`),
-    markRead: (id: string | number) =>
-      request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
-    markAllRead: () =>
-      request<{ success: boolean }>('/notifications/read-all', { method: 'PATCH' }),
-    confirm: (id: string | number) =>
-      request<{ success: boolean }>(`/notifications/${id}/confirm`, { method: 'PATCH' }),
-    decline: (id: string | number) =>
-      request<{ success: boolean }>(`/notifications/${id}/decline`, { method: 'PATCH' }),
-    adminAssetConfirmations: () =>
-      request<any[]>('/notifications/admin/asset-confirmations'),
+    me: (unreadOnly = false) => request<any[]>(`/notifications/me${unreadOnly ? '?unreadOnly=true' : ''}`),
+    markRead: (id: string | number) => request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
+    markAllRead: () => request<{ success: boolean }>('/notifications/read-all', { method: 'PATCH' }),
+    confirm: (id: string | number) => request<{ success: boolean }>(`/notifications/${id}/confirm`, { method: 'PATCH' }),
+    decline: (id: string | number) => request<{ success: boolean }>(`/notifications/${id}/decline`, { method: 'PATCH' }),
+    adminAssetConfirmations: () => request<any[]>('/notifications/admin/asset-confirmations'),
   },
 
   profile: {
     me: (_actor?: ActorContext) =>
-      request<{ profile: any; stats: { submittedRequests: number; submittedMaintenance: number } }>(
-        '/profile/me',
-      ),
+      request<{ profile: any; stats: { submittedRequests: number; submittedMaintenance: number } }>('/profile/me'),
     updateMe: (data: any, _actor?: ActorContext) =>
-      request<{ success: boolean; profile: any }>(
-        '/profile/me',
-        { method: 'PUT', body: JSON.stringify(data) },
-      ),
+      request<{ success: boolean; profile: any }>('/profile/me', { method: 'PUT', body: JSON.stringify(data) }),
     myRequests: (scope: ArchiveScope = 'active', _actor?: ActorContext) =>
       request<any[]>(withScope('/profile/me/requests', scope)),
     myMaintenance: (scope: ArchiveScope = 'active', _actor?: ActorContext) =>
@@ -339,26 +277,14 @@ suppliers: createArchivableResource('suppliers'),
   },
 
   reports: {
-    licenseCompliance: () =>
-      request<{ report: any[]; summary: any }>('/reports/license-compliance'),
-    assetValuation: () =>
-      request<{ report: any[]; summary: any }>('/reports/asset-valuation'),
-    departmentAllocation: () =>
-      request<{ report: any[]; summary: any }>('/reports/department-allocation'),
-    maintenanceCost: () =>
-      request<{ report: any[]; assetsReport: any[]; summary: any }>('/reports/maintenance-cost'),
-    employeeAssetHistory: () =>
-      request<{ report: any[]; summary: any }>('/reports/employee-asset-history'),
+    licenseCompliance: () => request<{ report: any[]; summary: any }>('/reports/license-compliance'),
+    assetValuation: () => request<{ report: any[]; summary: any }>('/reports/asset-valuation'),
+    departmentAllocation: () => request<{ report: any[]; summary: any }>('/reports/department-allocation'),
+    maintenanceCost: () => request<{ report: any[]; assetsReport: any[]; summary: any }>('/reports/maintenance-cost'),
+    employeeAssetHistory: () => request<{ report: any[]; summary: any }>('/reports/employee-asset-history'),
     unconfirmedAssignments: () =>
-      request<{ report: any[]; pending: any[]; confirmed: any[]; declined: any[]; summary: any }>('/reports/unconfirmed-assignments'),
+      request<{ report: any[]; pending: any[]; confirmed: any[]; declined: any[]; summary: any }>(
+        '/reports/unconfirmed-assignments',
+      ),
   },
 };
-
-
-
-
-
-
-
-
-
