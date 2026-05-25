@@ -37,7 +37,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {open && options && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
             <h2 className="text-lg font-semibold text-slate-900">
               {options.title || 'Please confirm'}
@@ -72,4 +72,5 @@ export function useConfirm() {
   if (!ctx) throw new Error('useConfirm must be used inside ConfirmProvider');
   return ctx;
 }
+
 

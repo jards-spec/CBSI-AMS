@@ -6,7 +6,6 @@ import {
   Box,
   Edit2,
   ChevronDown,
-  AlertTriangle,
   Building2,
   Users,
   Briefcase,
@@ -20,6 +19,7 @@ import {
   Hash,
 } from 'lucide-react';
 import EmployeeModal from '../components/EmployeeModal';
+import AdminPasswordConfirmModal from '../components/AdminPasswordConfirmModal';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
@@ -29,15 +29,36 @@ type Scope = 'active' | 'archived' | 'all';
 
 const Employees = () => {
   const confirmDialog = useConfirm();
-const { currentUser, logout, canCreate, canEdit, canDelete, canViewAll } = useAuth();
+  const { currentUser, logout, canCreate, canEdit, canDelete, canViewAll } = useAuth();
   const [scope, setScope] = useState<Scope>('active');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState('All Departments');
   const [employees, setEmployees] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
+  const [adminPasswordRequest, setAdminPasswordRequest] = useState<{
+    title: string;
+    message: string;
+    confirmText: string;
+    danger?: boolean;
+    resolve: (password: string | null) => void;
+  } | null>(null);
+
+  const requestAdminPassword = (options: {
+    title: string;
+    message: string;
+    confirmText: string;
+    danger?: boolean;
+  }) =>
+    new Promise<string | null>((resolve) => {
+      setAdminPasswordRequest({ ...options, resolve });
+    });
+
+  const closeAdminPasswordRequest = (password: string | null) => {
+    adminPasswordRequest?.resolve(password);
+    setAdminPasswordRequest(null);
+  };
 
   const loadData = async (nextScope: Scope = scope) => {
     const [employeeRows, assetRows] = await Promise.all([
@@ -81,10 +102,37 @@ const { currentUser, logout, canCreate, canEdit, canDelete, canViewAll } = useAu
 
   const handleSaveEmployee = async (formData: any) => {
     try {
+      const isEditingNow = Boolean(editingEmployee);
+      const isPasswordChange =
+        isEditingNow && Boolean(String(formData.password || '').trim());
+
+      const ok = await confirmDialog({
+        title: isEditingNow ? 'Confirm Employee Update' : 'Confirm Employee Creation',
+        message: isEditingNow
+          ? isPasswordChange
+            ? `Save changes and update password for ${formData.name}?`
+            : `Save profile changes for ${formData.name}?`
+          : `Create employee record for ${formData.name}?`,
+        confirmText: isEditingNow ? 'Save Changes' : 'Create Employee',
+        cancelText: 'Cancel',
+        danger: false,
+      });
+
+      if (!ok) return;
+
+      const adminPassword = await requestAdminPassword({
+        title: 'Admin Password Required',
+        message: isEditingNow
+          ? `Confirm your current admin password to update ${formData.name}.`
+          : `Confirm your current admin password to create ${formData.name}.`,
+        confirmText: isEditingNow ? 'Save Changes' : 'Create Employee',
+      });
+      if (!adminPassword) return;
+
       if (editingEmployee) {
-        await api.employees.update(editingEmployee.id, formData);
+        await api.employees.update(editingEmployee.id, { ...formData, adminPassword });
       } else {
-        await api.employees.create(formData);
+        await api.employees.create({ ...formData, adminPassword });
       }
 
       await loadData();
@@ -107,18 +155,27 @@ const { currentUser, logout, canCreate, canEdit, canDelete, canViewAll } = useAu
     }
 
     const ok = await confirmDialog({
-  title: 'Archive Employee',
-  message: `Archive ${employee.name}?`,
-  confirmText: 'Archive',
-  cancelText: 'Cancel',
-  danger: true,
-});
-if (!ok) return;
+      title: 'Archive Employee',
+      message: `Archive ${employee.name}?`,
+      confirmText: 'Archive',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
+      const adminPassword = await requestAdminPassword({
+        title: 'Admin Password Required',
+        message: `Confirm your current admin password to archive ${employee.name}.`,
+        confirmText: 'Archive',
+        danger: true,
+      });
+      if (!adminPassword) return;
+
       await api.employees.archive(employee.id, {
         archivedById: currentUser?.id,
         archivedByName: currentUser?.name,
+        adminPassword,
       });
       await loadData();
     } catch (error: any) {
@@ -133,9 +190,17 @@ if (!ok) return;
     }
 
     try {
+      const adminPassword = await requestAdminPassword({
+        title: 'Admin Password Required',
+        message: `Confirm your current admin password to restore ${employee.name}.`,
+        confirmText: 'Restore',
+      });
+      if (!adminPassword) return;
+
       await api.employees.restore(employee.id, {
         archivedById: currentUser?.id,
         archivedByName: currentUser?.name,
+        adminPassword,
       });
       await loadData();
     } catch (error: any) {
@@ -144,8 +209,7 @@ if (!ok) return;
   };
 
   const getRoleIcon = (role: string) => {
-
-switch (role) {
+    switch (role) {
       case 'Admin':
         return <Crown size={14} className="text-red-600" />;
       case 'Superuser':
@@ -158,8 +222,7 @@ switch (role) {
   };
 
   const getRoleBadgeColor = (role: string) => {
-
-switch (role) {
+    switch (role) {
       case 'Admin':
         return 'border-red-600/50 bg-red-600/10 text-red-500';
       case 'Superuser':
@@ -198,7 +261,7 @@ switch (role) {
               <span>{currentUser?.department}</span>
               {currentUser?.employeeNumber ? (
                 <>
-                  <span>â€¢</span>
+                  <span> - ¢</span>
                   <span>{currentUser.employeeNumber}</span>
                 </>
               ) : null}
@@ -459,12 +522,20 @@ switch (role) {
           onSave={handleSaveEmployee}
         />
       ) : null}
+
+      {adminPasswordRequest ? (
+        <AdminPasswordConfirmModal
+          isOpen={Boolean(adminPasswordRequest)}
+          title={adminPasswordRequest.title}
+          message={adminPasswordRequest.message}
+          confirmText={adminPasswordRequest.confirmText}
+          danger={adminPasswordRequest.danger}
+          onCancel={() => closeAdminPasswordRequest(null)}
+          onConfirm={(password) => closeAdminPasswordRequest(password)}
+        />
+      ) : null}
     </div>
   );
 };
 
 export default Employees;
-
-
-
-
