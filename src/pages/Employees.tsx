@@ -222,8 +222,7 @@ const Employees = () => {
   };
 
   const getRoleBadgeColor = (role: string) => {
-
-switch (role) {
+    switch (role) {
       case 'Admin':
         return 'border-red-600/50 bg-red-600/10 text-red-500';
       case 'Superuser':
@@ -262,7 +261,7 @@ switch (role) {
               <span>{currentUser?.department}</span>
               {currentUser?.employeeNumber ? (
                 <>
-                  <span>â€¢</span>
+                  <span> - ¢</span>
                   <span>{currentUser.employeeNumber}</span>
                 </>
               ) : null}
@@ -523,12 +522,20 @@ switch (role) {
           onSave={handleSaveEmployee}
         />
       ) : null}
+
+      {adminPasswordRequest ? (
+        <AdminPasswordConfirmModal
+          isOpen={Boolean(adminPasswordRequest)}
+          title={adminPasswordRequest.title}
+          message={adminPasswordRequest.message}
+          confirmText={adminPasswordRequest.confirmText}
+          danger={adminPasswordRequest.danger}
+          onCancel={() => closeAdminPasswordRequest(null)}
+          onConfirm={(password) => closeAdminPasswordRequest(password)}
+        />
+      ) : null}
     </div>
   );
 };
 
 export default Employees;
-
-
-
-
